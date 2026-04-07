@@ -16,6 +16,7 @@ on:
 permissions:
   contents: read
   security-events: write
+  statuses: write
 
 jobs:
   # Scan dependencies for known vulnerabilities
@@ -120,7 +121,7 @@ jobs:
           fetch-depth: 0
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           queries: security-extended
@@ -157,7 +158,7 @@ jobs:
         continue-on-error: true
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: '/language:javascript-typescript'
 
@@ -182,7 +183,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
@@ -206,12 +207,11 @@ jobs:
           path: '.'
           format: 'SARIF'
           args: >
-            --enablePackageSadness
+            --enableExperimental
             --enableNpm
-            --enableNodeModuleAudit
 
       - name: Upload OWASP Dependency-Check results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: 'dependency-check-report.sarif'
@@ -242,7 +242,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload Semgrep SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: 'semgrep.sarif'
