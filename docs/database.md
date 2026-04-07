@@ -1,271 +1,160 @@
 # Database Schema & Migrations
 
-Guide to Drizzle ORM schema, migrations, and NeonDB connection.
-
-**Last Updated**: 2026-04-07  
-**ORM**: Drizzle v0.45  
-**Database**: PostgreSQL (NeonDB)
+**Last Updated**: April 7, 2026  
+**Version**: 1.0.0
 
 ---
 
-## Database Configuration
+## Overview
 
-### Connection Setup
-File: `src/database/drizzle.config.ts`
-
-```typescript
-import 'dotenv/config';
-import { defineConfig } from 'drizzle-kit';
-
-export default defineConfig({
-  schema: './src/database/drizzle/schema.ts',
-  out: './src/database/drizzle/migrations',
-  dialect: 'postgresql',
-  dbCredentials: {
-    url: process.env.DATABASE_URL!,
-  },
-  migrations: {
-    prefix: 'timestamp',
-  },
-});
-```
-
-### Environment Variables
-```env
-DATABASE_URL=postgresql://user:password@host:5432/dbname
-
-# Example NeonDB connection:
-DATABASE_URL=postgresql://user:passwordtoken@ep-quiet-bird-123.us-east-1.neon.tech/dbname?sslmode=require
-```
+- **ORM**: Drizzle ORM v0.45
+- **Database**: PostgreSQL (NeonDB serverless)
+- **Connection**: `pg` + `@neondatabase/serverless` adapters
+- **Migrations**: SQL-based with version control
 
 ---
 
 ## Schema Definition
 
-### Location
-`src/database/drizzle/schema.ts`
+All tables are defined in `src/database/drizzle/schema.ts`:
 
-### Example: Users Table
 ```typescript
-import { pgTable, text, timestamp, uuid, boolean, index } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
+import { pgTable, serial, text, timestamp, varchar, boolean } from 'drizzle-orm/pg-core';
 
-export const users = pgTable(
-  'users',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    email: text('email').notNull().unique(),
-    name: text('name').notNull(),
-    passwordHash: text('password_hash').notNull(),
-    isActive: boolean('is_active').notNull().default(true),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => ({
-    emailIdx: index('email_idx').on(table.email),
-    createdAtIdx: index('created_at_idx').on(table.createdAt),
-  }),
-);
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  firstName: varchar('first_name', { length: 100 }),
+  lastName: varchar('last_name', { length: 100 }),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
-// Define relationships
-export const usersRelations = relations(users, ({ many }) => ({
-  posts: many(posts),
-  comments: many(comments),
-}));
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
 ```
 
-### Example: Posts Table
+### Type Safety
+
+Use Drizzle's type inference for maximum type safety:
+
 ```typescript
-export const posts = pgTable(
-  'posts',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    title: text('title').notNull(),
-    content: text('content'),
-    published: boolean('published').notNull().default(false),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => ({
-    userIdIdx: index('posts_user_id_idx').on(table.userId),
-  }),
-);
+import { User, NewUser } from '@database/drizzle/schema';
 
-export const postsRelations = relations(posts, ({ one, many }) => ({
-  author: one(users, {
-    fields: [posts.userId],
-    references: [users.id],
-  }),
-  comments: many(comments),
-}));
-```
+// User: Full type (includes all fields)
+const user: User = { id: 1, email: '...', ... };
 
----
-
-## Data Types
-
-### Supported Types
-```typescript
-// Text
-text('field_name')
-varchar('field_name', { length: 255 })
-
-// Numbers
-integer('field_name')
-serial('field_name')
-bigint('field_name')
-decimal('field_name', { precision: 10, scale: 2 })
-real('field_name')
-
-// UUID
-uuid('field_name')
-
-// Boolean
-boolean('field_name')
-
-// Dates
-timestamp('created_at', { withTimezone: true })
-date('birth_date')
-
-// JSON
-jsonb('metadata')  // PostgreSQL-specific
-
-// Arrays (PostgreSQL)
-text('tags').array()
-integer('scores').array()
-
-// Enums
-pgEnum('user_role')('admin', 'user', 'guest')
+// NewUser: Insert/update type (excludes auto-generated fields like id, createdAt)
+const newUser: NewUser = { email: '...', passwordHash: '...' };
 ```
 
 ---
 
 ## Migrations
 
-### Auto-Generate Migrations
+### Generate Migration
+
+When you modify `schema.ts`, generate a migration:
+
 ```bash
 pnpm run db:generate
 ```
 
-Generates migration files in `src/database/drizzle/migrations/`
+This creates a new SQL file in `src/database/drizzle/migrations/`:
+
+```sql
+-- migration: 0001_add_users_table.sql
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+```
 
 ### Run Migrations
+
 ```bash
 pnpm run db:migrate
 ```
 
-### Migration File Example
-```sql
--- Migration: 1704067200_initial.sql
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email TEXT NOT NULL UNIQUE,
-  name TEXT NOT NULL,
-  password_hash TEXT NOT NULL,
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
-);
+This applies all pending migrations to the database.
 
-CREATE INDEX email_idx ON users (email);
-CREATE INDEX created_at_idx ON users (created_at);
+### Workflow
+
 ```
-
-### Migration Workflow
-1. **Update schema** in `schema.ts`
-2. **Generate** migration: `pnpm run db:generate`
-3. **Review** generated SQL
-4. **Run** migration: `pnpm run db:migrate`
-5. **Commit** migration files to git
-
----
-
-## Database Module Setup
-
-### File: `src/database/database.module.ts`
-
-```typescript
-import { Module } from '@nestjs/common';
-import { drizzle } from 'drizzle-orm/neon-http';
-import { sql } from 'drizzle-orm';
-import * as schema from './drizzle/schema';
-
-@Module({
-  providers: [
-    {
-      provide: 'DATABASE',
-      useFactory: async () => {
-        const db = drizzle(
-          sql`${process.env.DATABASE_URL}`,
-          { schema },
-        );
-        return db;
-      },
-    },
-  ],
-  exports: ['DATABASE'],
-})
-export class DatabaseModule {}
+1. Edit src/database/drizzle/schema.ts
+2. Run: pnpm run db:generate
+3. Review generated SQL in migrations/
+4. Run: pnpm run db:migrate
+5. Test your code against new schema
+6. Commit schema.ts + generated migration files
 ```
 
 ---
 
-## Using in Services/Repositories
+## Seeding
 
-### Repository Pattern
+### Seed Data
+
+Define seed data in `src/database/drizzle/schema.ts`:
+
 ```typescript
-import { Injectable, Inject } from '@nestjs/common';
-import { Database } from 'drizzle-orm/neon-http';
-import { users } from '@database/drizzle/schema';
+export const SEED_USERS: NewUser[] = [
+  {
+    email: 'admin@example.com',
+    passwordHash: 'hashed-password',
+    firstName: 'Admin',
+    lastName: 'User',
+  },
+  {
+    email: 'user@example.com',
+    passwordHash: 'hashed-password',
+    firstName: 'Test',
+    lastName: 'User',
+  },
+];
+```
 
-@Injectable()
-export class UserRepository {
-  constructor(@Inject('DATABASE') private db: Database) {}
+### Seed Script
 
-  async findAll() {
-    return this.db.query.users.findMany();
-  }
+Create `src/database/seeds/seed.ts`:
 
-  async findById(id: string) {
-    return this.db.query.users.findFirst({
-      where: (users, { eq }) => eq(users.id, id),
-    });
-  }
+```typescript
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+import * as schema from '../drizzle/schema';
 
-  async create(data: CreateUserInput) {
-    const [result] = await this.db
-      .insert(users)
-      .values(data)
-      .returning();
-    return result;
-  }
+async function seed() {
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const db = drizzle(pool, { schema });
 
-  async update(id: string, data: UpdateUserInput) {
-    const [result] = await this.db
-      .update(users)
-      .set(data)
-      .where((users, { eq }) => eq(users.id, id))
-      .returning();
-    return result;
-  }
+  console.log('Starting seed...');
 
-  async delete(id: string) {
-    await this.db
-      .delete(users)
-      .where((users, { eq }) => eq(users.id, id));
-  }
+  // Clear existing data (careful in production!)
+  await db.delete(schema.users);
+
+  // Insert seed data
+  await db.insert(schema.users).values(schema.SEED_USERS);
+
+  console.log('✅ Seed completed');
+
+  await pool.end();
 }
+
+seed().catch(error => {
+  console.error('❌ Seed failed:', error);
+  process.exit(1);
+});
+```
+
+### Run Seeds
+
+```bash
+pnpm run db:seed
 ```
 
 ---
@@ -273,32 +162,42 @@ export class UserRepository {
 ## Relationships
 
 ### One-to-Many
-```typescript
-// User has many Posts
-const postsRelations = relations(posts, ({ one }) => ({
-  author: one(users, {
-    fields: [posts.userId],
-    references: [users.id],
-  }),
-}));
-```
 
-### Many-to-One
+Example: User has many Posts
+
 ```typescript
-// Post belongs to User
-const usersRelations = relations(users, ({ many }) => ({
+import { pgTable, serial, text, integer, timestamp } from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
+
+export const posts = pgTable('posts', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  title: text('title').notNull(),
+  content: text('content'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const usersRelations = relations(users, ({ many }) => ({
   posts: many(posts),
 }));
+
+export const postsRelations = relations(posts, ({ one }) => ({
+  author: one(users, { fields: [posts.userId], references: [users.id] }),
+}));
+
+export type Post = typeof posts.$inferSelect;
+export type NewPost = typeof posts.$inferInsert;
 ```
 
-### Many-to-Many
+### Query with Relations
+
 ```typescript
-// Usually requires junction table
-export const userRoles = pgTable('user_roles', {
-  userId: uuid('user_id')
-    .references(() => users.id, { onDelete: 'cascade' }),
-  roleId: uuid('role_id')
-    .references(() => roles.id, { onDelete: 'cascade' }),
+// Get user with all posts
+const userWithPosts = await db.query.users.findFirst({
+  where: eq(users.id, userId),
+  with: {
+    posts: true, // Load related posts
+  },
 });
 ```
 
@@ -306,186 +205,142 @@ export const userRoles = pgTable('user_roles', {
 
 ## Query Examples
 
-### Select All
-```typescript
-const allUsers = await db.query.users.findMany();
-```
-
-### Select with Filter
-```typescript
-const user = await db.query.users.findFirst({
-  where: (users, { eq }) => eq(users.email, 'john@example.com'),
-});
-```
-
-### Select with Relations
-```typescript
-const user = await db.query.users.findFirst({
-  where: (users, { eq }) => eq(users.id, userId),
-  with: {
-    posts: true,
-    comments: true,
-  },
-});
-```
-
 ### Insert
+
 ```typescript
-const newUser = await db.insert(users).values({
-  email: 'new@example.com',
-  name: 'New User',
-  passwordHash: hashedPassword,
-}).returning();
+const [newUser] = await db
+  .insert(users)
+  .values({
+    email: 'john@example.com',
+    passwordHash: 'hashed',
+    firstName: 'John',
+  })
+  .returning();
+
+return newUser;
+```
+
+### Select (Find One)
+
+```typescript
+const user = await db.query.users.findFirst({
+  where: eq(users.email, email),
+});
+```
+
+### Select (Find Many)
+
+```typescript
+const allUsers = await db.query.users.findMany({
+  limit: 10,
+  offset: 0,
+});
 ```
 
 ### Update
+
 ```typescript
-await db
+const [updated] = await db
   .update(users)
-  .set({ name: 'Updated Name' })
-  .where((users, { eq }) => eq(users.id, userId));
+  .set({ firstName: 'Jane' })
+  .where(eq(users.id, userId))
+  .returning();
 ```
 
 ### Delete
+
 ```typescript
-await db
-  .delete(users)
-  .where((users, { eq }) => eq(users.id, userId));
+await db.delete(users).where(eq(users.id, userId));
 ```
 
 ---
 
-## Drizzle Studio
+## Database Tools
 
-### Open Web UI
+### Drizzle Studio (GUI)
+
+Inspect your database with a visual interface:
+
 ```bash
 pnpm run db:studio
 ```
 
-Provides GUI for:
-- Viewing data
-- Managing tables
-- Executing queries
-- Inspecting schema
+Opens at `http://localhost:5555`
 
----
+### Format SQL
 
-## Constraints
-
-### Primary Key
-```typescript
-id: uuid('id').primaryKey()
-```
-
-### Unique
-```typescript
-email: text('email').unique()
-```
-
-### Not Null
-```typescript
-name: text('name').notNull()
-```
-
-### Foreign Key with Actions
-```typescript
-userId: uuid('user_id')
-  .notNull()
-  .references(() => users.id, {
-    onDelete: 'cascade',  // Delete posts if user deleted
-    onUpdate: 'cascade',  // Update posts if user id changes
-  })
-```
-
-### Default Values
-```typescript
-isActive: boolean('is_active').default(true)
-createdAt: timestamp('created_at').defaultNow()
-```
-
----
-
-## Indexes
-
-### Single Column Index
-```typescript
-email: text('email').indexing('btree'),
-```
-
-### Composite Index
-```typescript
-(table) => ({
-  userEmailIdx: index('user_email_idx')
-    .on(table.userId, table.email),
-})
-```
-
-### Unique Index
-```typescript
-(table) => ({
-  emailUnique: uniqueIndex('email_unique').on(table.email),
-})
-```
-
----
-
-## Performance Considerations
-
-1. **Index Frequently Queried Columns**
-   - Foreign keys
-   - Filter/sort columns
-   - Search fields (email, username)
-
-2. **Normalize Data**
-   - Avoid data duplication
-   - Use relationships properly
-   - Keep tables focused
-
-3. **Query Optimization**
-   - Load only needed relations
-   - Use pagination for large datasets
-   - Batch operations when possible
-
-4. **Connection Pooling**
-   - NeonDB handles automatically
-   - Set `maxConnections` if needed
-
----
-
-## Troubleshooting
-
-### Migration Error
 ```bash
-# Reset migrations (development only!)
-pnpm run db:drop  # If available in drizzle-kit version
-
-# Manual recovery:
-1. Fix schema.ts
-2. Generate new migration
-3. Review SQL
-4. Run migration
-```
-
-### Connection Issues
-```bash
-# Test connection
-npx drizzle-kit test
-
-# Verify DATABASE_URL in .env
-echo $DATABASE_URL
-```
-
-### Schema Drift
-```bash
-# Regenerate migrations to sync with schema
-pnpm run db:generate
+pnpm run db:format
 ```
 
 ---
 
-## Update Schedule
-This file is updated when:
-- New tables are added
-- Schema changes occur
-- Relationships change
-- Migration strategies evolve
+## Best Practices
+
+1. **Always use migrations** — Never execute raw SQL against production
+2. **Test migrations locally** — Run `db:migrate` and test thoroughly
+3. **Seed test data** — Use seed files for development/testing
+4. **Use transactions** — For multi-step operations
+5. **Index foreign keys** — Improves join performance
+6. **Add constraints** — NOT NULL, UNIQUE, CHECK for data integrity
+7. **Version control schema** — Commit schema.ts and migrations
+8. **Type-safe queries** — Use Drizzle's type inference
+9. **Avoid N+1 queries** — Load relationships with `with` clause
+10. **Handle timestamps** — Always include `createdAt` and `updatedAt`
+
+---
+
+## Common Patterns
+
+### Pagination Repository Method
+
+```typescript
+async findPaginated(page = 1, limit = 10): Promise<{ items: User[]; total: number }> {
+  const offset = (page - 1) * limit;
+
+  const items = await this.db.query.users.findMany({
+    limit,
+    offset,
+    orderBy: desc(schema.users.createdAt),
+  });
+
+  const result = await this.db
+    .select({ count: count() })
+    .from(schema.users);
+
+  const total = result[0]?.count || 0;
+
+  return { items, total };
+}
+```
+
+### Transaction Example
+
+```typescript
+async createUserWithProfile(userData: CreateUserDto): Promise<User> {
+  const [user] = await this.db.transaction(async (tx) => {
+    const [newUser] = await tx
+      .insert(users)
+      .values(userData)
+      .returning();
+
+    await tx.insert(userProfiles).values({
+      userId: newUser.id,
+      bio: '',
+    });
+
+    return [newUser];
+  });
+
+  return user;
+}
+```
+
+---
+
+## References
+
+- Drizzle Docs: https://orm.drizzle.team
+- PostgreSQL Docs: https://www.postgresql.org/docs
+- NeonDB Docs: https://neon.tech/docs
+

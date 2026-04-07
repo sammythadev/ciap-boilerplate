@@ -1,7 +1,8 @@
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { setupSwagger } from './swagger';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -33,28 +34,13 @@ async function bootstrap() {
     }),
   );
 
-  // Swagger/OpenAPI Documentation
-  const config = new DocumentBuilder()
-    .setTitle('Test API')
-    .setDescription('NestJS API with Drizzle ORM and PostgreSQL')
-    .setVersion('1.0.0')
-    .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-      'access-token',
-    )
-    .addTag('health', 'Health check endpoints')
-    .build();
-
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document, {
-    swaggerOptions: {
-      persistAuthorization: true,
-    },
-  });
+  // Setup Swagger/OpenAPI Documentation
+  setupSwagger(app);
 
   await app.listen(port, () => {
     logger.log(`🚀 Server running on http://localhost:${port}`);
-    logger.log(`📚 Swagger docs available at http://localhost:${port}/api/docs`);
+    logger.log(`📚 Swagger docs available at http://localhost:${port}/api`);
+    logger.log(`❤️  Health check at http://localhost:${port}/health`);
     logger.log(`📡 Environment: ${nodeEnv}`);
     logger.log(`📊 Log Level: ${logLevel}`);
   });

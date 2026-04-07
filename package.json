@@ -1,18 +1,24 @@
 {
   "name": "test-api",
   "version": "0.0.1",
-  "description": "",
+  "description": "CIAP ",
   "author": "",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "preinstall": "npx only-allow pnpm",
+    "prebuild": "rimraf dist",
+    "clean": "rimraf dist && rimraf node_modules && pnpm store prune",
     "build": "nest build",
+    "typecheck": "tsc --noEmit",
+    "typecheck:watch": "tsc --noEmit --watch",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
-    "start:dev": "nest start --watch",
+    "start:dev": "nest start --watch --config nest-cli.json",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "lint": "eslint",
+    "lint-fix": "eslint --fix",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
@@ -21,7 +27,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "db:format": "drizzle-kit format"
+    "db:format": "drizzle-kit format",
+    "db:seed": "ts-node -P tsconfig.seed.json -r tsconfig-paths/register src/database/seeds/seed.ts",
+    "db:seed:prod": "node dist/database/seeds/seed"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
@@ -42,9 +50,11 @@
     "jsonwebtoken": "^9.0.3",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "pg": "^8.20.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "swagger-ui-express": "^4.6.3"
+    "swagger-ui-express": "^4.6.3",
+    "typeorm": "^0.3.28"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -63,6 +73,7 @@
     "@types/node": "^24.0.0",
     "@types/passport": "^1.0.16",
     "@types/passport-jwt": "^4.0.1",
+    "@types/pg": "^8.11.8",
     "@types/supertest": "^7.0.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.18.0",
@@ -86,6 +97,13 @@
       "json",
       "ts"
     ],
+    "packagemanager": "pnpm@10.33.0",
+    "engines": {
+      "npm": "please-use-pnpm",
+      "yarn": "please-use-pnpm",
+      "node": ">= 24.11.0",
+      "pnpm": ">= 10.25.0"
+    },
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {

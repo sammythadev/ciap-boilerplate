@@ -1,599 +1,397 @@
 # Code Patterns & Best Practices
 
-Standard patterns and best practices for consistent, high-quality code.
-
-**Last Updated**: 2026-04-07  
-**Framework**: NestJS v11 + TypeScript + Drizzle ORM
-
----
-
-## SOLID Principles in NestJS
-
-### Single Responsibility Principle
-Each class has one reason to change.
-
-**Bad:**
-```typescript
-@Injectable()
-export class UserService {
-  constructor(private db: Database) {}
-  
-  // Too many responsibilities!
-  async createUser(data) { /* db insert */ }
-  async sendEmail(email) { /* email logic */ }
-  async logActivity(action) { /* logging */ }
-  async validateEmail(email) { /* validation */ }
-}
-```
-
-**Good:**
-```typescript
-// Service: Business logic
-@Injectable()
-export class UserService {
-  constructor(private repository: UserRepository) {}
-  
-  async createUser(data): Promise<User> {
-    return this.repository.create(data);
-  }
-}
-
-// Repository: Data access
-@Injectable()
-export class UserRepository {
-  constructor(@Inject('DATABASE') private db: Database) {}
-  
-  async create(data): Promise<User> {
-    return this.db.insert(users).values(data).returning();
-  }
-}
-
-// Email Service: Email handling
-@Injectable()
-export class EmailService {
-  async sendWelcomeEmail(email: string): Promise<void> {
-    // Email logic here
-  }
-}
-
-// Logger Service: Logging
-@Injectable()
-export class LoggerService {
-  log(action: string): void {
-    // Logging here
-  }
-}
-```
-
-### Open/Closed Principle
-Classes should be open for extension, closed for modification.
-
-**Bad:**
-```typescript
-// Adding new authentication method requires modifying this class
-@Injectable()
-export class AuthService {
-  authenticate(strategy: string, credentials: any) {
-    if (strategy === 'jwt') { /* JWT logic */ }
-    if (strategy === 'oauth') { /* OAuth logic */ }
-    if (strategy === 'password') { /* Password logic */ }
-  }
-}
-```
-
-**Good:**
-```typescript
-interface AuthStrategy {
-  authenticate(credentials: any): Promise<User>;
-}
-
-@Injectable()
-export class JwtStrategy implements AuthStrategy {
-  async authenticate(token: string): Promise<User> {
-    // JWT logic
-  }
-}
-
-@Injectable()
-export class PasswordStrategy implements AuthStrategy {
-  async authenticate(credentials: Credentials): Promise<User> {
-    // Password logic
-  }
-}
-
-@Injectable()
-export class AuthService {
-  constructor(
-    private jwtStrategy: JwtStrategy,
-    private passwordStrategy: PasswordStrategy,
-  ) {}
-  
-  async authenticate(strategy: 'jwt' | 'password', credentials: any): Promise<User> {
-    const strategyImpl = strategy === 'jwt' ? this.jwtStrategy : this.passwordStrategy;
-    return strategyImpl.authenticate(credentials);
-  }
-}
-```
-
-### Liskov Substitution Principle
-Subtypes must be substitutable for their base types.
-
-```typescript
-interface Repository<T> {
-  findAll(): Promise<T[]>;
-  findById(id: string): Promise<T | null>;
-  create(data: Partial<T>): Promise<T>;
-}
-
-@Injectable()
-export class UserRepository implements Repository<User> {
-  // All methods must work exactly as interface promises
-  async findAll(): Promise<User[]> { /* */ }
-  async findById(id: string): Promise<User | null> { /* */ }
-  async create(data: Partial<User>): Promise<User> { /* */ }
-}
-
-@Injectable()
-export class ProductRepository implements Repository<Product> {
-  // Same contract, different implementation
-  async findAll(): Promise<Product[]> { /* */ }
-  async findById(id: string): Promise<Product | null> { /* */ }
-  async create(data: Partial<Product>): Promise<Product> { /* */ }
-}
-```
-
-### Interface Segregation Principle
-Depend on specific interfaces, not broad ones.
-
-**Bad:**
-```typescript
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  password: string;  // Controller shouldn't know about password
-  passwordHash: string;
-  role: string;
-  permissions: string[];
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-@Controller('users')
-export class UserController {
-  // Controller gets full User interface with sensitive data
-  constructor(private service: UserService) {}
-}
-```
-
-**Good:**
-```typescript
-// Domain interface
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  passwordHash: string;
-  role: string;
-  permissions: string[];
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Response DTO - only public fields
-export class UserDto {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-  createdAt: Date;
-}
-
-@Controller('users')
-export class UserController {
-  constructor(private service: UserService) {}
-  
-  @Get(':id')
-  async getUser(@Param('id') id: string): Promise<UserDto> {
-    // Only expose what's necessary
-    const user = await this.service.getUser(id);
-    return this.mapToDto(user);
-  }
-}
-```
-
-### Dependency Inversion Principle
-Depend on abstractions, not concrete implementations.
-
-**Bad:**
-```typescript
-import { PostgresUserRepository } from './repositories/postgres-user.repository';
-
-@Injectable()
-export class UserService {
-  // Tightly coupled to PostgreSQL implementation
-  constructor(private repository: PostgresUserRepository) {}
-}
-```
-
-**Good:**
-```typescript
-interface IUserRepository {
-  findById(id: string): Promise<User | null>;
-  create(data: Partial<User>): Promise<User>;
-}
-
-@Injectable()
-export class UserService {
-  // Depends on abstraction, not concrete implementation
-  constructor(
-    @Inject('USER_REPOSITORY') private repository: IUserRepository,
-  ) {}
-}
-
-// Implementation can be swapped
-@Module({
-  providers: [
-    {
-      provide: 'USER_REPOSITORY',
-      useClass: PostgresUserRepository, // Can change to MongoUserRepository
-    },
-  ],
-})
-export class UserModule {}
-```
-
----
-
-## Dependency Injection Pattern
-
-### Provider Definition
-```typescript
-@Module({
-  providers: [
-    // Class provider (most common)
-    UserService,
-    
-    // Factory provider
-    {
-      provide: 'CONFIG',
-      useFactory: () => ({
-        apiUrl: process.env.API_URL,
-      }),
-    },
-    
-    // Value provider
-    {
-      provide: 'DATABASE_URL',
-      useValue: process.env.DATABASE_URL,
-    },
-    
-    // Alias provider
-    {
-      provide: 'USER_REPOSITORY',
-      useExisting: UserRepository,
-    },
-  ],
-})
-export class AppModule {}
-```
-
-### Injection Examples
-```typescript
-@Injectable()
-export class UserService {
-  constructor(
-    private repository: UserRepository,        // Class provider
-    @Inject('CONFIG') private config: any,     // Named provider
-    @Inject('DATABASE_URL') private dbUrl: string,
-    @Optional() private logger?: LoggerService, // Optional
-  ) {}
-}
-```
+**Last Updated**: April 7, 2026  
+**Version**: 1.0.0
 
 ---
 
 ## Service Layer Pattern
 
+### Template
+
 ```typescript
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { UserRepository } from './users.repository';
+import { CreateUserDto, UpdateUserDto, UserDto } from './dto';
+import { User } from '@database/drizzle/schema';
+
 @Injectable()
 export class UserService {
-  constructor(
-    private repository: UserRepository,
-    private emailService: EmailService,
-    private logger: LoggerService,
-  ) {}
+  constructor(private repository: UserRepository) {}
 
+  // CREATE
   async createUser(dto: CreateUserDto): Promise<UserDto> {
-    // Validation
-    const existingUser = await this.repository.findByEmail(dto.email);
-    if (existingUser) {
+    // 1. Validate (check business logic)
+    const existing = await this.repository.findByEmail(dto.email);
+    if (existing) {
       throw new ConflictException('Email already exists');
     }
 
-    // Business logic
-    const passwordHash = await this.hashPassword(dto.password);
-    const user = await this.repository.create({
-      email: dto.email,
-      name: dto.name,
-      passwordHash,
-    });
+    // 2. Execute business logic
+    const user = await this.repository.create(dto);
 
-    // Side effects
-    await this.emailService.sendWelcomeEmail(user.email);
-    this.logger.log(`User created: ${user.id}`);
+    // 3. Side effects (send email, publish event, etc.)
+    // await this.emailService.sendWelcomeEmail(user.email);
 
-    // Return DTO
+    // 4. Return DTO (never return entity)
     return this.mapToDto(user);
   }
 
-  private async hashPassword(password: string): Promise<string> {
-    return bcrypt.hash(password, 10);
+  // READ
+  async getUserById(id: number): Promise<UserDto> {
+    const user = await this.repository.findById(id);
+    if (!user) {
+      throw new NotFoundException(`User #${id} not found`);
+    }
+    return this.mapToDto(user);
   }
 
+  // UPDATE
+  async updateUser(id: number, dto: UpdateUserDto): Promise<UserDto> {
+    const user = await this.repository.findById(id);
+    if (!user) {
+      throw new NotFoundException(`User #${id} not found`);
+    }
+
+    // Check for conflicts (e.g., email collision)
+    if (dto.email && dto.email !== user.email) {
+      const existing = await this.repository.findByEmail(dto.email);
+      if (existing) {
+        throw new ConflictException('Email already exists');
+      }
+    }
+
+    const updated = await this.repository.update(id, dto);
+    return this.mapToDto(updated);
+  }
+
+  // DELETE
+  async deleteUser(id: number): Promise<void> {
+    const user = await this.repository.findById(id);
+    if (!user) {
+      throw new NotFoundException(`User #${id} not found`);
+    }
+    await this.repository.delete(id);
+  }
+
+  // HELPER: Map entity to DTO (never expose entity structure)
   private mapToDto(user: User): UserDto {
     return {
       id: user.id,
       email: user.email,
-      name: user.name,
+      firstName: user.firstName,
+      lastName: user.lastName,
       createdAt: user.createdAt,
     };
   }
 }
 ```
 
+### Key Points
+
+- ✅ Inject repository or external services
+- ✅ Validate business logic (check constraints)
+- ✅ Throw custom exceptions for errors
+- ✅ Return DTOs, never entities
+- ✅ Keep methods focused on single responsibility
+- ❌ Never query database directly (use repository)
+- ❌ Never expose entity fields to clients
+
 ---
 
-## Repository Pattern
+## Repository Layer Pattern
+
+### Template
 
 ```typescript
+import { Injectable } from '@nestjs/common';
+import { eq, ilike } from 'drizzle-orm';
+import { Database } from '@database/database.module';
+import { users } from '@database/drizzle/schema';
+import { CreateUserDto, UpdateUserDto } from './dto';
+
 @Injectable()
 export class UserRepository {
-  constructor(@Inject('DATABASE') private db: Database) {}
+  constructor(private db: Database) {}
 
-  async findAll(limit = 10, offset = 0): Promise<User[]> {
+  async findById(id: number) {
+    return this.db.query.users.findFirst({
+      where: eq(users.id, id),
+    });
+  }
+
+  async findByEmail(email: string) {
+    return this.db.query.users.findFirst({
+      where: eq(users.email, email),
+    });
+  }
+
+  async findAll(limit = 10, offset = 0) {
     return this.db.query.users.findMany({
       limit,
       offset,
-      orderBy: (users) => desc(users.createdAt),
+      orderBy: [desc(users.createdAt)],
     });
   }
 
-  async findById(id: string): Promise<User | null> {
-    return this.db.query.users.findFirst({
-      where: (users, { eq }) => eq(users.id, id),
-    });
+  async count() {
+    const result = await this.db
+      .select({ count: count() })
+      .from(users);
+    return result[0]?.count || 0;
   }
 
-  async findByEmail(email: string): Promise<User | null> {
-    return this.db.query.users.findFirst({
-      where: (users, { eq }) => eq(users.email, email),
-    });
-  }
-
-  async create(data: CreateUserInput): Promise<User> {
+  async create(dto: CreateUserDto) {
     const [user] = await this.db
       .insert(users)
-      .values(data)
+      .values(dto)
       .returning();
     return user;
   }
 
-  async update(id: string, data: UpdateUserInput): Promise<User> {
+  async update(id: number, dto: UpdateUserDto) {
     const [user] = await this.db
       .update(users)
-      .set({ ...data, updatedAt: new Date() })
-      .where((users, { eq }) => eq(users.id, id))
+      .set(dto)
+      .where(eq(users.id, id))
       .returning();
     return user;
   }
 
-  async delete(id: string): Promise<void> {
-    await this.db
-      .delete(users)
-      .where((users, { eq }) => eq(users.id, id));
+  async delete(id: number) {
+    await this.db.delete(users).where(eq(users.id, id));
   }
 }
 ```
 
+### Key Points
+
+- ✅ Handle all database queries
+- ✅ Return entities or null (never throw)
+- ✅ Accept DTOs or plain objects
+- ✅ Keep queries reusable and simple
+- ✅ Use Drizzle's query builder
+- ❌ Never handle business logic (let service decide)
+- ❌ Never throw custom exceptions (repository's job is data access)
+
 ---
 
-## DTO Validation Pattern
+## Controller Layer Pattern
+
+### Template
 
 ```typescript
-import { IsString, IsEmail, IsNotEmpty, MinLength } from 'class-validator';
+import {
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Res,
+  HttpStatus,
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { Response } from 'express';
+import { UserService } from './users.service';
+import { CreateUserDto, UpdateUserDto, UserDto } from './dto';
+import { JwtAuthGuard } from '@common/guards/jwt-auth.guard';
+import { LoggingInterceptor } from '@common/interceptors/logging.interceptor';
+
+@ApiTags('users')
+@Controller('users')
+@UseGuards(JwtAuthGuard)
+@UseInterceptors(LoggingInterceptor)
+export class UsersController {
+  constructor(private service: UserService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new user' })
+  @ApiResponse({ status: 201, type: UserDto, description: 'User created successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiResponse({ status: 409, description: 'Email already exists' })
+  @HttpCode(HttpStatus.CREATED)
+  async create(@Body() dto: CreateUserDto): Promise<UserDto> {
+    return this.service.createUser(dto);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get user by ID' })
+  @ApiResponse({ status: 200, type: UserDto })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async getOne(@Param('id') id: string): Promise<UserDto> {
+    return this.service.getUserById(Number(id));
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update user' })
+  @ApiResponse({ status: 200, type: UserDto })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserDto,
+  ): Promise<UserDto> {
+    return this.service.updateUser(Number(id), dto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete user' })
+  @ApiResponse({ status: 204, description: 'User deleted' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async delete(@Param('id') id: string): Promise<void> {
+    await this.service.deleteUser(Number(id));
+  }
+}
+```
+
+### Key Points
+
+- ✅ Use decorators for routing and validation
+- ✅ Include Swagger decorators for documentation
+- ✅ Delegate all logic to service
+- ✅ Return DTOs, never entities
+- ✅ Let guards/interceptors/filters handle errors
+- ❌ Never query database directly
+- ❌ Never catch or handle custom exceptions (let filters handle)
+
+---
+
+## DTO Pattern
+
+### Template
+
+```typescript
+import { IsEmail, IsString, MinLength, IsOptional, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateUserDto {
   @ApiProperty({ example: 'john@example.com' })
   @IsEmail()
   @IsNotEmpty()
-  email: string;
+  email!: string;
 
-  @ApiProperty({ example: 'John Doe' })
+  @ApiProperty({ example: 'SecurePassword123!' })
   @IsString()
-  @IsNotEmpty()
-  @MinLength(2)
-  name: string;
-
-  @ApiProperty({ example: 'password123' })
-  @IsString()
-  @IsNotEmpty()
   @MinLength(8)
-  password: string;
+  @IsNotEmpty()
+  password!: string;
+
+  @ApiProperty({ example: 'John' })
+  @IsString()
+  @IsOptional()
+  firstName?: string;
+
+  @ApiProperty({ example: 'Doe' })
+  @IsString()
+  @IsOptional()
+  lastName?: string;
 }
 
-// In controller
-@Post()
-@UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-async create(@Body() dto: CreateUserDto): Promise<UserDto> {
-  // DTO is validated automatically
-  return this.service.createUser(dto);
+export class UpdateUserDto {
+  @ApiProperty({ example: 'John Updated' })
+  @IsString()
+  @IsOptional()
+  firstName?: string;
+
+  @ApiProperty({ example: 'Doe Updated' })
+  @IsString()
+  @IsOptional()
+  lastName?: string;
+}
+
+export class UserDto {
+  @ApiProperty({ example: 1 })
+  id!: number;
+
+  @ApiProperty({ example: 'john@example.com' })
+  email!: string;
+
+  @ApiProperty({ example: 'John' })
+  firstName?: string;
+
+  @ApiProperty({ example: 'Doe' })
+  lastName?: string;
+
+  @ApiProperty()
+  createdAt!: Date;
 }
 ```
 
----
+### Key Points
 
-## Exception Handling Pattern
-
-```typescript
-// Custom exceptions
-export class UserNotFoundException extends HttpException {
-  constructor(id: string) {
-    super(`User with ID ${id} not found`, HttpStatus.NOT_FOUND);
-  }
-}
-
-export class DuplicateEmailException extends HttpException {
-  constructor(email: string) {
-    super(
-      {
-        statusCode: HttpStatus.CONFLICT,
-        message: 'Email already in use',
-        email,
-      },
-      HttpStatus.CONFLICT,
-    );
-  }
-}
-
-// Usage in service
-async getUser(id: string): Promise<UserDto> {
-  const user = await this.repository.findById(id);
-  if (!user) {
-    throw new UserNotFoundException(id);
-  }
-  return this.mapToDto(user);
-}
-
-// Global exception filter
-@Catch(HttpException)
-export class HttpExceptionFilter implements ExceptionFilter {
-  catch(exception: HttpException, host: ArgumentsHost) {
-    const ctx = host.switchToHttp();
-    const response = ctx.getResponse<Response>();
-    const status = exception.getStatus();
-    const exceptionResponse = exception.getResponse();
-
-    response.status(status).json({
-      statusCode: status,
-      message: exceptionResponse['message'],
-      timestamp: new Date().toISOString(),
-    });
-  }
-}
-
-// Register in AppModule
-@Module({
-  providers: [
-    {
-      provide: APP_FILTER,
-      useClass: HttpExceptionFilter,
-    },
-  ],
-})
-export class AppModule {}
-```
+- ✅ Use validators (`@IsEmail()`, `@MinLength()`, etc.)
+- ✅ Non-optional fields use `!` operator
+- ✅ Optional fields use `?`
+- ✅ Include `@ApiProperty()` for Swagger docs
+- ✅ Separate create, update, and response DTOs
+- ❌ Never include database internals in DTOs
+- ❌ Never expose passwords or secrets
 
 ---
 
-## Async/Await Best Practices
+## Error Handling Pattern
+
+See `/docs/exceptions.md` for complete patterns.
+
+Quick example:
 
 ```typescript
-// ✅ Good: Parallel when independent
-async function getUser(id: string) {
-  const [user, posts, comments] = await Promise.all([
-    this.repository.findById(id),
-    this.postService.findByUserId(id),
-    this.commentService.findByUserId(id),
-  ]);
-  return { user, posts, comments };
-}
-
-// ❌ Bad: Sequential when can be parallel
-async function getUser(id: string) {
-  const user = await this.repository.findById(id);
-  const posts = await this.postService.findByUserId(id);  // Waits for user
-  const comments = await this.commentService.findByUserId(id);  // Waits for posts
-  return { user, posts, comments };
-}
-
-// ✅ Good: Error handling
-async function createUser(data: CreateUserDto) {
-  try {
-    return await this.repository.create(data);
-  } catch (error) {
-    if (error.code === '23505') {  // Unique violation
-      throw new ConflictException('Email already exists');
+@Injectable()
+export class UserService {
+  async getUserById(id: number): Promise<UserDto> {
+    const user = await this.repository.findById(id);
+    
+    if (!user) {
+      throw new NotFoundException(`User #${id} not found`);
     }
-    throw error;
+
+    return this.mapToDto(user);
   }
 }
-```
 
----
-
-## Type Safety Pattern
-
-```typescript
-// ✅ Always specify return types
-async getUser(id: string): Promise<UserDto> { /* */ }
-findUsers(ids: string[]): User[] { /* */ }
-private mapToDto(user: User): UserDto { /* */ }
-
-// ❌ Avoid implicit any
-async getUser(id) { /* */ }  // return type inferred
-function map(data) { /* */ }  // any parameter
-
-// ✅ Use strict types for functions
-type UserFilter = {
-  email?: string;
-  role?: UserRole;
-  isActive?: boolean;
-};
-
-async findUsers(filter: UserFilter): Promise<User[]> { /* */ }
-
-// ❌ Avoid object spreads with unknown types
-const user = { ...unknownObject };  // Could be anything
+// Exception filter catches NotFoundException
+// Formats as 404 JSON response
+// Logs full error internally
+// No stack trace sent to client
 ```
 
 ---
 
 ## Testing Pattern
 
+See `/docs/testing.md` for complete patterns.
+
+Quick example:
+
 ```typescript
 describe('UserService', () => {
   let service: UserService;
   let repository: UserRepository;
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        UserService,
-        {
-          provide: UserRepository,
-          useValue: {
-            findById: jest.fn(),
-            create: jest.fn(),
-          },
-        },
-      ],
-    }).compile();
+  beforeEach(() => {
+    repository = {
+      findById: jest.fn(),
+      create: jest.fn(),
+    } as any;
 
-    service = module.get<UserService>(UserService);
-    repository = module.get<UserRepository>(UserRepository);
+    service = new UserService(repository);
   });
 
   it('should create a user', async () => {
-    const dto: CreateUserDto = { /* */ };
-    const expectedUser: User = { /* */ };
+    const dto = { email: 'test@example.com', password: 'secret' };
+    const expected = { id: 1, email: 'test@example.com', ...dto };
 
-    jest.spyOn(repository, 'create').mockResolvedValue(expectedUser);
+    jest.spyOn(repository, 'create').mockResolvedValue(expected);
 
     const result = await service.createUser(dto);
 
-    expect(result).toEqual(expectedUser);
+    expect(result).toEqual(expected);
     expect(repository.create).toHaveBeenCalledWith(dto);
   });
 });
@@ -601,9 +399,23 @@ describe('UserService', () => {
 
 ---
 
-## Update Schedule
-This file is updated when:
-- New patterns are discovered
-- Best practices change
-- Common issues are identified
-- Framework versions require pattern updates
+## Module Pattern
+
+```typescript
+@Module({
+  imports: [DatabaseModule],
+  controllers: [UsersController],
+  providers: [UsersService, UsersRepository],
+  exports: [UsersService],
+})
+export class UsersModule {}
+```
+
+---
+
+## References
+
+- See `/docs/project-structure.md` for complete architecture
+- See `/docs/exceptions.md` for error handling
+- See `/docs/testing.md` for testing patterns
+

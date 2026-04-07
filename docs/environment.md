@@ -1,410 +1,337 @@
-# Environment Configuration Guide
+# Environment Variables & Configuration
 
-Complete guide for managing environments in this NestJS project.
-
-**Last Updated**: 2026-04-07
+**Last Updated**: April 7, 2026  
+**Version**: 1.0.0
 
 ---
 
 ## Overview
 
-The project supports three environments controlled by the `NODE_ENV` variable:
+Environment variables manage **secrets** (API keys, passwords), **configuration** (URLs, timeouts), and **constants** (ports, retry counts).
 
-- **development** — Local development with verbose logging and relaxed CORS
-- **staging** — Pre-production testing with structured logging and staging services
-- **production** — Live environment with strict security and minimal logging
+### CRITICAL RULE: Never Hardcode Environment-Dependent Values
 
----
-
-## Environment Files
-
-### Structure
-
-```
-.env                   # Development defaults (loaded first)
-.env.example          # Template with all variables documented
-.env.staging          # Staging configuration
-.env.production       # Production configuration ⚠️ DO NOT COMMIT
-.env.*.local          # Local overrides (git-ignored) — Optional
+❌ **Forbidden**:
+```typescript
+const DATABASE_URL = 'postgresql://user:pass@localhost:5432/db';
+const API_KEY = 'sk-1234567890abcdef';
+const SMTP_PASSWORD = 'mySecurePassword123';
+const PORT = 3000;
+const FRONTEND_URL = 'http://localhost:3000';
 ```
 
-### Loading Order
-
-1. `.env` is always loaded first (default values)
-2. `.env.{NODE_ENV}` is loaded and overwrites `.env` values
-3. `.env.{NODE_ENV}.local` is loaded if it exists (for personal overrides)
-
-### Git Strategy
-
-```bash
-# Version control
-✅ .env.example       (template, always commit)
-✅ .env              (development defaults, can commit)
-✅ .env.staging      (template-like config, can commit)
-
-# Do NOT commit
-❌ .env.production   (has secrets)
-❌ .env.*.local      (personal overrides)
-❌ .env.development.local  (personal secrets)
+✅ **Correct**:
+```typescript
+const DATABASE_URL = process.env.DATABASE_URL;
+const API_KEY = process.env.API_KEY;
+const SMTP_PASSWORD = process.env.SMTP_PASSWORD;
+const PORT = process.env.PORT || 3000;
+const FRONTEND_URL = process.env.FRONTEND_URL;
 ```
 
 ---
 
-## Using NODE_ENV
+## Required Environment Variables
 
-### Development (Default)
+### Database (Required)
 
-```bash
-# Development automatically when not set
-npm run start:dev
+| Variable | Type | Required | Example | Notes |
+|----------|------|----------|---------|-------|
+| `DATABASE_URL` | String | Yes | `postgresql://user:pass@host:5432/dbname` | NeonDB connection string |
+| `DATABASE_POOL_SIZE` | Number | No | `20` | Connection pool size (default: 10) |
+| `DATABASE_TIMEOUT` | Number | No | `5000` | Query timeout in ms (default: 5000) |
 
-# Or explicitly:
-export NODE_ENV=development
-pnpm run start:dev
-```
+### Application (Required)
 
-**Configuration:**
-- `LOG_LEVEL=debug` — Verbose logging
-- `LOG_FORMAT=pretty` — Human-readable logs
-- `CORS_ORIGIN=http://localhost:3000` — Allow localhost
-- `DATABASE_URL=local/dev database` — Local database
-- `JWT_SECRET=dev key` — Simple secret (not secure)
+| Variable | Type | Required | Example | Notes |
+|----------|------|----------|---------|-------|
+| `NODE_ENV` | String | No | `development` | development, staging, production (default: development) |
+| `PORT` | Number | No | `3000` | Server port (default: 3000) |
+| `LOG_LEVEL` | String | No | `info` | debug, info, warn, error (default: info) |
 
----
+### Authentication (Required if using JWT)
 
-### Staging
+| Variable | Type | Required | Example | Notes |
+|----------|------|----------|---------|-------|
+| `JWT_SECRET` | String | Yes | `your-super-secret-key-min-32-chars` | Minimum 32 characters for security |
+| `JWT_EXPIRY` | String | No | `24h` | Token expiration (default: 24h) |
+| `JWT_REFRESH_SECRET` | String | No | `your-refresh-secret-key` | For refresh token strategy |
 
-```bash
-# Set environment before running
-export NODE_ENV=staging
-pnpm run build
-pnpm start
+### External APIs (Conditional)
 
-# Or as environment variable
-NODE_ENV=staging pnpm start
-```
+| Variable | Type | Required | Example | Notes |
+|----------|------|----------|---------|-------|
+| `SMTP_HOST` | String | If using email | `smtp.gmail.com` | Email server host |
+| `SMTP_PORT` | Number | If using email | `587` | Typically 587 (TLS) or 465 (SSL) |
+| `SMTP_USER` | String | If using email | `your-email@gmail.com` | Sender email |
+| `SMTP_PASSWORD` | String | If using email | `app-specific-password` | Use app-specific password for Gmail |
+| `STRIPE_API_KEY` | String | If using Stripe | `sk_live_xxxxx` | Stripe secret key |
+| `STRIPE_WEBHOOK_SECRET` | String | If using Stripe | `whsec_xxxxx` | Stripe webhook signing secret |
 
-**Configuration:**
-- `LOG_LEVEL=log` — Standard logging
-- `LOG_FORMAT=json` — Structured JSON logs
-- `CORS_ORIGIN=https://staging.yourdomain.com` — Staging domain
-- `DATABASE_URL=staging database` — Staging database
-- `JWT_SECRET=staging secret` — Secure random secret
-- `STRIPE_SECRET_KEY=sk_test_...` — Test keys
+### Application URLs (Configuration)
 
-**Use Cases:**
-- Testing before production
-- Integration testing
-- UAT (User Acceptance Testing)
-- Load testing with realistic data
+| Variable | Type | Required | Example | Notes |
+|----------|------|----------|---------|-------|
+| `FRONTEND_URL` | String | No | `http://localhost:3000` | Frontend URL for CORS, email links |
+| `API_URL` | String | No | `http://localhost:3001` | API URL for docs, external references |
 
 ---
 
-### Production
+## `.env.example` Template
 
 ```bash
-# Set environment before running
-export NODE_ENV=production
-pnpm run build
-pnpm start
-
-# Or in Docker
-docker run -e NODE_ENV=production ...
-
-# Or on platform (Vercel, Heroku, AWS, etc.)
-# Set NODE_ENV environment variable in platform settings
-```
-
-**Configuration:**
-- `LOG_LEVEL=error` — Errors only
-- `LOG_FORMAT=json` — Structured JSON for parsers
-- `CORS_ORIGIN=https://yourdomain.com` — Production domain only
-- `DATABASE_URL=prod database` — Production database
-- `JWT_SECRET=strong random secret` — Very secure
-- `STRIPE_SECRET_KEY=sk_live_...` — Live keys
-
----
-
-## Environment Variables Reference
-
-### Core
-
-| Variable | Development | Staging | Production |
-|----------|-------------|---------|------------|
-| `NODE_ENV` | development | staging | production |
-| `PORT` | 3000 | 3000 | 3000 |
-| `HOST` | localhost | 0.0.0.0 | 0.0.0.0 |
-
-### Database
-
-| Variable | Development | Staging | Production |
-|----------|-------------|---------|------------|
-| `DATABASE_URL` | local/dev DB | staging DB | prod DB (HA) |
-| SSL Mode | disable/require | require | require |
-
-### Logging
-
-| Variable | Development | Staging | Production |
-|----------|-------------|---------|------------|
-| `LOG_LEVEL` | debug | log | error |
-| `LOG_FORMAT` | pretty | json | json |
-
-### API
-
-| Variable | Development | Staging | Production |
-|----------|-------------|---------|------------|
-| `CORS_ORIGIN` | http://localhost:3000 | https://staging.* | https://yourdomain.com |
-| `CORS_CREDENTIALS` | true | true | false |
-| `API_PREFIX` | /api | /api | /api |
-
-### Security
-
-| Variable | Development | Staging | Production |
-|----------|-------------|---------|------------|
-| `JWT_SECRET` | any string | secure random | VERY secure random |
-| `JWT_EXPIRATION` | 24h | 24h | 24h |
-| Rate Limiting | 100 req/min | 100 req/min | 50 req/min |
-
-### Payment (if using Stripe)
-
-| Variable | Development | Staging | Production |
-|----------|-------------|---------|------------|
-| `STRIPE_SECRET_KEY` | sk_test_... | sk_test_... | sk_live_... |
-| `STRIPE_PUBLIC_KEY` | pk_test_... | pk_test_... | pk_live_... |
-
----
-
-## Local Development Setup
-
-### Initial Setup
-
-```bash
-# 1. Copy template
-cp .env.example .env
-
-# 2. Update for your local setup if needed
-# Most defaults work out of the box for local development
-
-# 3. Start development server
-pnpm run start:dev
-
-# Logs should show:
-# 🚀 Server running on http://localhost:3000
-# 📚 Swagger docs available at http://localhost:3000/api
-# 📡 Environment: development
-# 📊 Log Level: debug
-```
-
-### Personal Overrides (Local Only)
-
-Create `.env.development.local` for personal settings (git-ignored):
-
-```bash
-# .env.development.local (git-ignored)
-DATABASE_URL=postgresql://user:pass@localhost:5432/my_db
-MAIL_PASSWORD=my-personal-app-password
-```
-
-This file is git-ignored and will override `.env.development` locally.
-
----
-
-## Docker & Production Deployment
-
-### Docker Run
-
-```bash
-docker build -t myapi .
-
-# Development
-docker run -e NODE_ENV=development myapi
-
-# Staging
-docker run -e NODE_ENV=staging \
-  -e DATABASE_URL="postgresql://..." \
-  myapi
-
-# Production
-docker run -e NODE_ENV=production \
-  -e DATABASE_URL="postgresql://..." \
-  -e JWT_SECRET="very-secure-secret" \
-  myapi
-```
-
-### Docker Compose
-
-```yaml
-version: '3.8'
-services:
-  app:
-    build: .
-    environment:
-      NODE_ENV: ${NODE_ENV:-development}
-      DATABASE_URL: ${DATABASE_URL}
-      JWT_SECRET: ${JWT_SECRET}
-    ports:
-      - "3000:3000"
-```
-
-```bash
-# Development
-docker-compose up
-
-# Production
-NODE_ENV=production DATABASE_URL=... JWT_SECRET=... docker-compose up
-```
-
-### Cloud Deployment (Vercel, Heroku, AWS, etc.)
-
-Set environment variables in platform settings:
-
-**Vercel:**
-```
-Settings → Environment Variables
-NODE_ENV: production
-DATABASE_URL: postgresql://...
-JWT_SECRET: ...
-```
-
-**Heroku:**
-```bash
-heroku config:set NODE_ENV=production
-heroku config:set DATABASE_URL=postgresql://...
-heroku config:set JWT_SECRET=...
-```
-
-**AWS Lambda / Elastic Beanstalk:**
-- Set in environment configuration
-- Or use AWS Secrets Manager for sensitive values
-
----
-
-## Security Best Practices
-
-### Development
-- ✅ Simple JWT secrets (not used in production)
-- ✅ Local database
-- ✅ Debug logging
-- ✅ Relaxed CORS (localhost only)
-
-### Staging
-- ✅ Strong JWT secrets (rotate regularly)
-- ✅ Staging database (separate from production)
-- ✅ Test API keys (Stripe, etc.)
-- ✅ Standard logging
-- ✅ Configured CORS
-
-### Production
-- ✅ EXTREMELY strong, random JWT secrets (minimum 32 characters)
-- ✅ NEVER store secrets in `.env` file
-- ✅ Use secrets vault (AWS Secrets Manager, HashiCorp Vault, etc.)
-- ✅ Rotate secrets regularly (every 90 days minimum)
-- ✅ Error-only logging
-- ✅ Strict CORS (production domain only)
-- ✅ HTTPS/TLS enforced
-- ✅ Database with high availability
-- ✅ Regular security audits
-
----
-
-## Troubleshooting
-
-### Wrong Environment Being Used
-
-```bash
-# Check current environment
-echo $NODE_ENV
-
-# Check what was loaded
-# Look at startup logs:
-# "📡 Environment: production"
-
-# Make sure environment is set BEFORE npm start
-export NODE_ENV=staging
-pnpm run start:dev
-```
-
-### Database Connection Fails
-
-```bash
-# Check NODE_ENV
-echo $NODE_ENV
-
-# Check which DATABASE_URL is being used:
-echo $DATABASE_URL
-
-# Verify credentials match the environment
-# Development: local database
-# Staging: staging database
-# Production: production database
-```
-
-### Logging Appears Wrong
-
-```bash
-# If you see debug logs but NODE_ENV=production, you might be in development
-echo $NODE_ENV
-echo $LOG_LEVEL
-
-# Check that .env.production exists and is loaded
-ls -la .env*
-
-# Restart application
-```
-
-### Secrets Not Working in Production
-
-```bash
-# DO NOT use .env.production for production deployment
-# Instead, set environment variables on your platform:
-
-# ✅ Use AWS Secrets Manager
-# ✅ Use HashiCorp Vault
-# ✅ Use platform environment variables (Vercel, Heroku, etc.)
-
-# ❌ Never commit .env.production
-# ❌ Never commit secrets to git
+# Database
+DATABASE_URL=postgresql://user:password@host:5432/dbname
+DATABASE_POOL_SIZE=20
+DATABASE_TIMEOUT=5000
+
+# Application
+NODE_ENV=development
+PORT=3000
+LOG_LEVEL=info
+
+# Authentication
+JWT_SECRET=your-super-secret-key-minimum-32-characters-long
+JWT_EXPIRY=24h
+JWT_REFRESH_SECRET=your-refresh-secret-key-minimum-32-characters
+
+# Email (Optional)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASSWORD=your-app-specific-password
+
+# Stripe (Optional)
+STRIPE_API_KEY=sk_live_xxxxxxxxxxxxx
+STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxx
+
+# URLs
+FRONTEND_URL=http://localhost:3000
+API_URL=http://localhost:3001
 ```
 
 ---
 
-## Creating a New Environment
+## Multi-Environment Setup
 
-If you need a fourth environment (e.g., `qa`):
+### File Organization
 
-1. Create `.env.qa`
-2. Add to startup script if needed
-3. Update documentation
-4. Add to deployment pipeline
-5. Set appropriate log levels and secrets
+```
+project/
+├── .env                    # Development (git-ignored)
+├── .env.example            # Template (committed)
+├── .env.staging            # Staging (in pipeline)
+├── .env.production         # Production (in secrets manager)
+└── ...
+```
 
----
+### Load Correct Environment File
 
-## Quick Reference
+In `main.ts`:
 
+```typescript
+import * as dotenv from 'dotenv';
+
+// Load .env based on NODE_ENV
+const envFile = `.env.${process.env.NODE_ENV || 'development'}`;
+dotenv.config({ path: envFile });
+
+// Then validate
+validateEnvironment();
+```
+
+### Environment-Specific Values
+
+**Development** (`.env`):
 ```bash
-# Development (default)
-pnpm run start:dev
-# Uses: .env → .env.development → .env.development.local
+DATABASE_URL=postgresql://dev:dev@localhost:5432/testapi_dev
+NODE_ENV=development
+LOG_LEVEL=debug
+FRONTEND_URL=http://localhost:3000
+STRIPE_API_KEY=sk_test_xxxxx  # Test mode
+```
 
-# Staging
-NODE_ENV=staging pnpm start
-# Uses: .env → .env.staging → .env.staging.local
+**Staging** (`.env.staging`):
+```bash
+DATABASE_URL=postgresql://user:pass@staging-db.example.com:5432/testapi_staging
+NODE_ENV=staging
+LOG_LEVEL=info
+FRONTEND_URL=https://staging.example.com
+STRIPE_API_KEY=sk_test_xxxxx  # Still test mode
+```
 
-# Production
-NODE_ENV=production pnpm start
-# Uses: .env → .env.production → .env.production.local
+**Production** (`.env.production` - in secrets manager, not in repo):
+```bash
+DATABASE_URL=postgresql://user:pass@prod-db.example.com:5432/testapi_prod
+NODE_ENV=production
+LOG_LEVEL=warn
+FRONTEND_URL=https://example.com
+STRIPE_API_KEY=sk_live_xxxxx  # Live mode
 ```
 
 ---
 
-## Related Documentation
+## Runtime Validation
 
-- [Findings](./findings.md) — Environment variable names and setup
-- [API Guide](./api.md) — API endpoints
-- [Database Guide](./database.md) — Connection and migrations
+**ALWAYS validate environment variables at startup**:
+
+```typescript
+// src/config/validation.ts
+import { Logger } from '@nestjs/common';
+
+export function validateEnvironment() {
+  const logger = new Logger('EnvironmentValidation');
+
+  const required = [
+    'DATABASE_URL',
+    'JWT_SECRET',
+  ];
+
+  const missing = required.filter(key => !process.env[key]);
+
+  if (missing.length > 0) {
+    const message = `Missing required environment variables: ${missing.join(', ')}. Check .env file.`;
+    logger.error(message);
+    throw new Error(message);
+  }
+
+  logger.log('✅ All required environment variables are set');
+
+  // Optional: Validate format
+  if (process.env.PORT && isNaN(Number(process.env.PORT))) {
+    throw new Error('PORT must be a number');
+  }
+
+  if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
+    logger.warn('⚠️ JWT_SECRET is less than 32 characters (weak)');
+  }
+}
+```
+
+Usage in `main.ts`:
+
+```typescript
+import { validateEnvironment } from '@config/validation';
+
+async function bootstrap() {
+  validateEnvironment();  // Validate before creating app
+  const app = await NestFactory.create(AppModule);
+  await app.listen(process.env.PORT || 3000);
+}
+
+bootstrap();
+```
 
 ---
 
-**Important**: Never commit `.env.production` or any `.env.*.local` files.  
-Always use `.env.example` as the template for environment setup.
+## Configuration in Services
+
+### Example: Database Service
+
+```typescript
+import { Database } from '@database/database.module';
+import { Logger } from '@nestjs/common';
+
+@Injectable()
+export class DatabaseService {
+  private logger = new Logger('DatabaseService');
+
+  constructor() {
+    const databaseUrl = process.env.DATABASE_URL;
+
+    if (!databaseUrl) {
+      const message = 'DATABASE_URL environment variable is not set. Check .env file.';
+      this.logger.error(message);
+      throw new Error(message);
+    }
+
+    // Use environment variable safely
+    this.db = this.createConnection(databaseUrl);
+  }
+
+  private createConnection(url: string): Database {
+    // Connection logic here
+  }
+}
+```
+
+### Example: Auth Service
+
+```typescript
+@Injectable()
+export class AuthService {
+  private readonly jwtSecret: string;
+  private readonly jwtExpiry: string;
+
+  constructor() {
+    this.jwtSecret = process.env.JWT_SECRET;
+    this.jwtExpiry = process.env.JWT_EXPIRY || '24h';
+
+    if (!this.jwtSecret) {
+      throw new Error('JWT_SECRET environment variable is not set');
+    }
+  }
+
+  signToken(payload: Record<string, any>): string {
+    return sign(payload, this.jwtSecret, { expiresIn: this.jwtExpiry });
+  }
+}
+```
+
+---
+
+## Category Reference
+
+### Secrets (Never commit, use environment)
+- `JWT_SECRET`, `JWT_REFRESH_SECRET`
+- `SMTP_PASSWORD`, `STRIPE_API_KEY`
+- `DATABASE_URL`
+- `STRIPE_WEBHOOK_SECRET`
+
+### Configuration (Different per environment)
+- `NODE_ENV`, `PORT`, `LOG_LEVEL`
+- `DATABASE_POOL_SIZE`, `DATABASE_TIMEOUT`
+- `JWT_EXPIRY`
+- `FRONTEND_URL`, `API_URL`
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`
+
+### Constants (Rarely change)
+- `PORT` (if default is acceptable)
+- `LOG_LEVEL` (if default is acceptable)
+
+---
+
+## Common Mistakes to Avoid
+
+| Mistake | Problem | Fix |
+|---------|---------|-----|
+| Checking `.env` in git with real values | Exposes secrets | Add `.env` to `.gitignore`, use `.env.example` |
+| Hardcoding URLs/keys with "defaults" | Different per environment | Everything from `process.env` with defaults only for non-critical |
+| Not validating env vars | Missing vars cause runtime crashes | Validate all required vars at startup |
+| Different var names in code vs docs | Team confusion | Document consistently in `.env.example` |
+| Forgetting to add new vars to `.env.example` | Others can't run app | Always update `.env.example` with every new var |
+| Using implicit `any` for env vars | Type errors | Use proper typing: `process.env.PORT as string` |
+
+---
+
+## Checklist: Adding New Environment Variable
+
+When adding a new environment variable:
+
+1. ✅ Determine if **secret** (never commit) or **config** (varies by env)
+2. ✅ Add to `.env.example` with placeholder value
+3. ✅ Add to this document with name, type, required, example, notes
+4. ✅ Add to validation schema (if using @nestjs/config)
+5. ✅ Add runtime validation in code (if critical)
+6. ✅ Update development `.env` file
+7. ✅ Document in pipeline/secrets manager config
+8. ✅ Test on local machine and staging
+
+---
+
+## References
+
+- JWT RFC: https://tools.ietf.org/html/rfc7519
+- 12-Factor App: https://12factor.net/config
+- NeonDB Docs: https://neon.tech/docs
+

@@ -1,247 +1,362 @@
-# Project Findings & Discoveries
+# Findings & Architecture Decisions
 
-Auto-updating log of repository searches, architectural decisions, and implementation notes.
-
-**Last Updated**: 2026-04-07  
+**Last Updated**: April 7, 2026  
 **Version**: 1.0.0
-
-## Archive
-
-### Initial Setup (2026-04-07)
-- **Decision**: Established NestJS v11 + TypeScript + Drizzle ORM + PostgreSQL architecture
-- **Path Aliases**: Configured in tsconfig.json for modular imports
-  - `@/*`: Root src reference
-  - `@modules/*`: Feature modules
-  - `@common/*`: Shared utilities
-  - `@database/*`: Database layer
-  - `@config/*`: Configuration
-  - `@types/*`: Type definitions
-  
-- **Database**: NeonDB connection via `@neondatabase/serverless`
-  - Schema location: `src/database/drizzle/schema.ts`
-  - Migrations: `src/database/drizzle/migrations/`
-  - Configuration: drizzle.config.ts updated with timestamp prefix
-
-- **API Documentation**: Swagger/OpenAPI integrated
-  - Added `@nestjs/swagger` and `swagger-ui-express`
-  - Endpoint: `/api` (configure in main.ts)
-
-- **TypeScript Strictness**: Enabled all strict flags
-  - `noImplicitAny: true`, `strict: true`
-  - `strictNullChecks`, `strictFunctionTypes`, `noImplicitReturns` enabled
-
-- **pnpm Scripts**: Organized and standardized
-  - Development: `pnpm run start:dev`
-  - Database: `pnpm run db:generate`, `pnpm run db:migrate`, `pnpm run db:studio`
-  - Testing: `pnpm run test`, `pnpm run test:e2e`, `pnpm run test:cov`
-
-- **Module Structure**: Directory layout established
-  - `src/modules/` - Feature modules
-  - `src/common/` - Shared decorators, filters, guards, interceptors, etc.
-  - `src/database/` - Database configuration and schema
-  - `src/config/` - Application configuration
-
-### Swagger & Logging Setup (2026-04-07)
-- **Swagger/OpenAPI Documentation**: Configured in `main.ts`
-  - Endpoint: `http://localhost:3000/api`
-  - Bearer token authentication configured
-  - Tags available: `health`
-  - Persistent authorization enabled (remember token)
-  
-- **Logging System**: 
-  - NestJS built-in logger with configurable log levels
-  - Log levels: `error`, `warn`, `log`, `debug`, `verbose`
-  - Environment variable: `LOG_LEVEL` (default: `debug`)
-  - Bootstrap logs server startup info with port, Swagger URL, environment
-
-- **CORS Configuration**:
-  - Configurable via `CORS_ORIGIN` env variable
-  - Methods: GET, POST, PUT, PATCH, DELETE
-  - Headers: Content-Type, Authorization
-  - Credentials: enabled
-
-- **Global Validation Pipe**:
-  - Whitelist enabled (strips unknown properties)
-  - Forbid non-whitelisted properties enabled
-  - Auto-transforms types when possible
-  - Implicit conversion enabled
-
-- **Health Check Endpoints**:
-  - `GET /health` - Returns API health status and uptime
-  - `GET /` - Returns API information and version
-  - Both endpoints documented in Swagger
-
-- **Environment Variables** (`.env` and `.env.example`):
-  - `DATABASE_URL` - PostgreSQL connection string
-  - `PORT` - Server port (default: 3000)
-  - `HOST` - Server host (default: 0.0.0.0)
-  - `NODE_ENV` - Environment (development, staging, production)
-  - `LOG_LEVEL` - Logging level (error, warn, log, debug, verbose)
-  - `LOG_FORMAT` - Log format (pretty for dev, json for prod)
-  - `CORS_ORIGIN` - CORS allowed origin
-  - `CORS_CREDENTIALS` - Allow credentials in CORS
-  - `API_VERSION` - API version (default: v1)
-  - `API_PREFIX` - API route prefix (default: /api)
-  - `JWT_SECRET` - JWT signing secret (minimum 32 chars)
-  - `JWT_EXPIRATION` - JWT expiration time
-  - `JWT_REFRESH_SECRET` - JWT refresh secret (minimum 32 chars)
-  - `JWT_REFRESH_EXPIRATION` - Refresh token expiration
-  
-### Comprehensive Environment Configuration (2026-04-07)
-- **Environment Files**:
-  - `.env` — Development defaults (committed to git)
-  - `.env.example` — Template with all variables documented (committed to git)
-  - `.env.staging` — Staging config with test keys (can be committed)
-  - `.env.production` — Production config (⚠️ NEVER commit, use secrets vault instead)
-  - `.env.*.local` — Personal local overrides (git-ignored)
-
-- **NODE_ENV Usage**:
-  - **Development**: `NODE_ENV=development` (default)
-    - Debug logging, local database, relaxed CORS
-    - 100 req/min rate limit
-  - **Staging**: `NODE_ENV=staging`
-    - Standard logging in JSON, staging database, test keys
-    - 100 req/min rate limit
-  - **Production**: `NODE_ENV=production`
-    - Error-only logging in JSON, prod database, live keys
-    - 50 req/min rate limit
-
-- **Preseeded Environment Variables** (for future integrations):
-  - **Email**: MAIL_HOST, MAIL_PORT, MAIL_USER, MAIL_PASSWORD, MAIL_FROM
-  - **AWS S3**: AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET
-  - **Stripe**: STRIPE_SECRET_KEY, STRIPE_PUBLIC_KEY
-  - **OAuth2**: GOOGLE_CLIENT_ID/SECRET, GITHUB_CLIENT_ID/SECRET, MICROSOFT_CLIENT_ID/SECRET
-  - **Monitoring**: SENTRY_DSN, SENTRY_ENVIRONMENT, SENTRY_TRACE_SAMPLE_RATE
-  - **Rate Limiting**: RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_REQUESTS
-  - **Cache**: CACHE_TTL, CACHE_MAX_SIZE
-  - **File Upload**: MAX_FILE_SIZE, UPLOAD_DIR
-
-- **Security**: 
-  - `.env.production` explicitly added to `.gitignore`
-  - `.env.*.local` git-ignored for personal secrets
-  - JWT secrets require minimum 32 characters in staging/production
-  - Production: Use secrets vault (AWS Secrets Manager, HashiCorp Vault, etc.)
-  - See `docs/environment.md` for complete environment guide
-
-### SWC Compiler Configuration (2026-04-07)
-
-### Type Declarations Repository-Wide (2026-04-07)
-- **Added Missing @types Packages**:
-  - `@types/body-parser` - Types for body-parser middleware
-  - `@types/cors` - Types for CORS package
-  - `@types/jsonwebtoken` - Types for JWT handling
-  - `@types/passport` - Types for Passport authentication
-  - `@types/passport-jwt` - Types for JWT strategy
-  
-- **TypeScript Configuration**:
-  - `tsconfig.json`: Strict mode enabled, path aliases configured
-  - `tsconfig.build.json`: Extends main config, excludes test files
-  - `types` field includes `["node", "jest"]` for proper type resolution
-  - `declaration: true` generates `.d.ts` files for distribution
-  
-- **Type Safety Standards**:
-  - `strict: true` - All strict type checks enabled
-  - `noImplicitAny: true` - Disallow implicit any types
-  - `strictNullChecks: true` - Null/undefined type checking
-  - `noImplicitReturns: true` - Disallow implicit undefined returns
-  - `forceConsistentCasingInFileNames: true` - Case-sensitive module resolution
-
-### SWC Compiler Configuration (2026-04-07)
-- **SWC Packages Added**: `@swc/cli`, `@swc/core`, `@swc/jest`
-  - Fast TypeScript/JavaScript compiler alternative to ts-loader
-  - Used for faster builds and test execution
-  - Source maps enabled for debugging
-  - External helpers enabled for code optimization
-
-- **`.swcrc` Configuration Highlights**:
-  - **Parse**: TypeScript with decorators support (NestJS requirement)
-    - `decorators: true` and `decoratorsBeforeExport: true` for NestJS
-    - Top-level await enabled
-    - Dynamic imports enabled
-    - Class fields and private methods supported
-  
-  - **Transform**:
-    - `decoratorMetadata: true` - Reflect metadata for NestJS DI
-    - `legacyDecorator: true` - Support legacy decorator syntax
-    - `useDefineForClassFields: true` - ES2022 field initialization
-  
-  - **Module**: CommonJS output with proper interop
-    - `type: "commonjs"` - Node.js compatible output
-    - `strictMode: true` - Strict mode enabled
-    - External helpers enabled
-  
-  - **Source Maps**: Enabled for development and debugging
-    - `sourceMap: true`
-    - `inlineSourcesContent: true`
-  
-  - **Build Optimization**:
-    - Dead code elimination enabled
-    - Keep class names (needed for reflection)
-    - Keep function names (for debugging)
-    - Node target: ES2021
 
 ---
 
-## Discovery Log
+## Overview
 
-Add entries as you discover patterns, dependencies, or make architectural decisions.
-
-### Format
-```
-### Discovery Title (YYYY-MM-DD)
-- **File(s)**: path/to/file.ts
-- **Finding**: What you discovered
-- **Action**: What will be done about it
-- **Impact**: How it affects the project
-```
-
-### Example
-```
-### Circular Dependency in User Module (2026-04-08)
-- **File(s)**: src/modules/users/users.service.ts, src/modules/users/users.repository.ts
-- **Finding**: Service imports Repository which imports Service
-- **Action**: Break circular dependency by using abstract interface
-- **Impact**: Enables proper DI and testing
-```
+This document tracks discoveries, decisions, and lessons learned during development. Auto-updated as new patterns are discovered.
 
 ---
 
 ## Architecture Decisions
 
-### ADR-001: Modular Service Repository Pattern
-- Use Repository pattern for data access
-- Services handle business logic
-- Controllers expose HTTP endpoints
-- Each feature gets its own module
+### DECIDED: 22 Path Aliases for Import Organization
 
-### ADR-002: Path Aliases for Clarity
-- Absolute imports via `@/*` instead of relative paths
-- Cleaner refactoring when moving files
-- Type safety with TypeScript resolution
+**Decision**: Configured 22 path aliases in `tsconfig.json` to organize imports by functionality, not directory depth.
 
-### ADR-003: Database Schema First
-- Drizzle ORM with explicit schema
-- Migrations version-controlled
-- NeonDB serverless connection
+**Aliases**:
+- `@/*` → `src/*` (general imports)
+- `@modules/*` → `src/modules/*` (feature modules)
+- `@common/*` → `src/common/*` (shared utilities)
+- `@database/*` → `src/database/*` (database layer)
+- `@config/*` → `src/config/*` (configuration)
+- `@types/*` → `src/types/*` (TypeScript types)
+- `@decorators/*`, `@exceptions/*`, `@filters/*`, `@guards/*`, `@interceptors/*`, `@middlewares/*`, `@pipes/*`, `@validators/*`, `@utils/*`, `@interfaces/*`, `@constants/*`, `@factories/*`, `@bases/*` (common subfolders)
+- `@migrations/*` → `src/database/migrations/*` (database migrations)
+- `@generated/*` → `src/generated/*` (auto-generated code)
+- `@test/*` → `test/*` (E2E tests)
 
----
+**Benefit**: No more relative paths like `../../../`, clear origin of imports, IDE autocomplete works.
 
-## New Features Log
-
-When implementing new features, document here:
-
-### Feature: User Authentication (Not Yet Implemented)
-- Status: Planned
-- Module Location: `src/modules/auth/`
-- Dependencies: Required JWT, bcrypt
-- Swagger Documentation: Required
+**Reference**: `tsconfig.json` compilerOptions.paths
 
 ---
 
-## Code Quality Notes
+### DECIDED: 18 Component Types in Common Module
 
-- **Type Coverage**: Aim for 100% (no `any` types)
-- **Testing**: Maintain >80% unit test coverage
-- **E2E Tests**: Write for critical user flows
-- **Documentation**: Swagger decorators on all endpoints
+**Decision**: Organized common module into 18 focused subdirectories instead of one large folder.
+
+**Component Types**:
+1. `bases/` - Base classes (BaseException, BaseRepository, BaseDTO, BaseEntity)
+2. `constants/` - Application constants (HTTP codes, regex, validation rules)
+3. `decorators/` - Custom decorators (@Public, @Roles, @CurrentUser, @Throttle)
+4. `exceptions/` - Exception hierarchy (AuthExceptions, UserExceptions, etc.)
+5. `factories/` - Test data factories
+6. `filters/` - Exception filters (HttpExceptionFilter, AllExceptionsFilter)
+7. `guards/` - Route guards (JwtAuthGuard, RolesGuard, etc.)
+8. `interceptors/` - HTTP interceptors (LoggingInterceptor, TimeoutInterceptor)
+9. `interfaces/` - Reusable TypeScript interfaces (IPaginated, IRequestUser)
+10. `middlewares/` - Express middlewares (LoggerMiddleware, CorsMiddleware)
+11. `pipes/` - Validation pipes (ValidationPipe, ParseIntPipe)
+12. `processors/` - Background job processors
+13. `utils/` - Utility functions (Logger, Crypto, Password, Pagination)
+14. `validators/` - Custom validators (EmailValidator, PasswordStrength)
+15. `repositories/` - *Reserved for base repository patterns*
+16. `services/` - *Reserved for shared services*
+17. `mappers/` - *Reserved for DTO/entity mappers*
+
+**Benefit**: Easy to locate components, prevents mega-folders, encourages modular thinking.
+
+**Reference**: `src/common/` directory structure
+
+---
+
+### DECIDED: Decorator Order (Class & Method Level)
+
+**Decision**: Established strict decorator ordering to maintain consistency.
+
+**Class Level Order**:
+1. Swagger: `@ApiTags()`
+2. Route: `@Controller()`, `@Module()`
+3. Guards: `@UseGuards()`
+4. Interceptors: `@UseInterceptors()`
+5. Pipes: `@UsePipes()`
+
+**Method Level Order**:
+1. Swagger: `@ApiOperation()`, `@ApiResponse()`
+2. HTTP: `@Get()`, `@Post()`, `@HttpCode()`
+3. Guards: `@UseGuards()`
+4. Interceptors: `@UseInterceptors()`
+5. Pipes: `@UsePipes()`
+
+**Benefit**: Predictable code structure, easier to read, consistent across codebase.
+
+**Reference**: `/docs/project-structure.md#decorator-order`, `agent.md`
+
+---
+
+### DECIDED: Never Leak Stack Traces to Clients
+
+**Decision**: All error responses sent to clients must be safe, structured JSON with no stack traces, file paths, or internal details.
+
+**Pattern**:
+```typescript
+// Client receives (safe)
+{
+  "statusCode": 500,
+  "message": "An error occurred processing your request",
+  "error": "Internal Server Error",
+  "timestamp": "2026-04-07T10:30:45.123Z",
+  "path": "/api/users"
+}
+
+// Logged internally (full details)
+{
+  "timestamp": "2026-04-07T10:30:45.123Z",
+  "level": "error",
+  "message": "Database query failed",
+  "stack": "Error: connection refused\n  at ...",
+  "context": "UserRepository",
+  "userId": 123,
+  "query": "SELECT * FROM users WHERE id = $1"
+}
+```
+
+**Benefit**: Security (no information leakage), consistency, better debugging (internal logs have full details).
+
+**Reference**: `/docs/exceptions.md`, `src/common/filters/`
+
+---
+
+### DECIDED: Environment Variables Never Hardcoded
+
+**Decision**: All configuration that varies by environment comes from `process.env` with validation at startup.
+
+**Categories**:
+- **Secrets** (never commit): API keys, passwords, JWT secrets
+- **Configuration** (varies per env): Database URL, ports, log levels, feature flags
+- **Constants** (rarely change): Default timeouts, max retry counts
+
+**Validation**:
+```typescript
+function validateEnvironment() {
+  const required = ['DATABASE_URL', 'JWT_SECRET'];
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    throw new Error(`Missing required env vars: ${missing.join(', ')}`);
+  }
+}
+```
+
+**Benefit**: Different configs per environment, no accidental secret commits, clear requirements.
+
+**Reference**: `/docs/environment.md`, `.env.example`
+
+---
+
+### DECIDED: Exception Hierarchy with BaseException
+
+**Decision**: Created custom exception hierarchy extending BaseException for domain-specific errors.
+
+**Hierarchy**:
+```
+BaseException (abstract)
+├── AuthException (401 Unauthorized)
+│   ├── InvalidCredentialsException
+│   └── TokenExpiredException
+├── UserException (400/409)
+│   ├── UserNotFoundException
+│   └── DuplicateEmailException
+├── DatabaseException (500)
+├── ValidationException (400)
+└── ExternalException (503)
+```
+
+**Benefits**: Type-safe error handling, specific HTTP status codes, domain-specific logic.
+
+**Reference**: `/docs/exceptions.md`, `src/common/exceptions/`
+
+---
+
+## Development Patterns Discovered
+
+### PATTERN: Service Returns DTO, Never Entity
+
+**Discovery**: Services should always return DTOs to clients, never database entities. This prevents:
+- Exposing internal database fields
+- Breaking API contracts when schema changes
+- Returning sensitive fields accidentally
+
+**Pattern**:
+```typescript
+// ✅ Correct
+async getUser(id: number): Promise<UserDto> {
+  const user = await this.repository.findById(id);
+  return this.mapToDto(user); // Remove sensitive fields
+}
+
+// ❌ Wrong
+async getUser(id: number): Promise<User> {
+  return this.repository.findById(id); // Exposes passwordHash, etc.
+}
+```
+
+**Where Used**: All service methods, all controllers
+
+---
+
+### PATTERN: Repository Returns Entity or Null
+
+**Discovery**: Repositories should never throw exceptions or validate business logic. Their job is purely data access.
+
+**Pattern**:
+```typescript
+// ✅ Correct (repository)
+async findById(id: number): Promise<User | null> {
+  return this.db.query.users.findFirst({ where: eq(users.id, id) });
+}
+
+// ✅ Correct (service)
+async getUser(id: number): Promise<UserDto> {
+  const user = await this.repository.findById(id);
+  if (!user) {
+    throw new NotFoundException(); // Service decides what to do
+  }
+  return this.mapToDto(user);
+}
+
+// ❌ Wrong (repository shouldn't validate)
+async findById(id: number): Promise<User> {
+  const user = await this.db.query.users.findFirst(...);
+  if (!user) throw new NotFoundException(); // Wrong layer
+  return user;
+}
+```
+
+**Where Used**: All repositories, all services
+
+---
+
+### PATTERN: Pagination Metadata
+
+**Discovery**: Paginated responses should include metadata for client UI navigation.
+
+**Pattern**:
+```typescript
+// Response format
+{
+  "data": [...items],
+  "meta": {
+    "total": 100,      // Total items in database
+    "page": 1,         // Current page (1-indexed)
+    "limit": 10,       // Items per page
+    "pages": 10        // Total pages available
+  }
+}
+```
+
+**Benefits**: Client can build pagination UI, show total counts, handle boundary cases.
+
+**Reference**: `/docs/api.md#pagination`, `/docs/patterns.md`
+
+---
+
+## Testing Discoveries
+
+### DISCOVERY: Test-First Approach for Endpoints
+
+**Finding**: Writing tests before implementation catches bugs and clarifies requirements.
+
+**Workflow**:
+1. Write controller tests (mock service)
+2. Write service tests (mock repository)
+3. Write repository tests (mock DB)
+4. Implement features
+
+**Benefits**: Clear specifications, fewer bugs, easier refactoring.
+
+**Reference**: `/docs/testing.md`
+
+---
+
+## Performance Notes
+
+### NOTE: N+1 Query Prevention
+
+**Pattern**: Use Drizzle's `with` clause to load relationships in a single query.
+
+**Bad**:
+```typescript
+const users = await db.query.users.findMany();
+for (const user of users) {
+  user.posts = await db.query.posts.findMany({ where: eq(posts.userId, user.id) });
+}
+// N+1 queries: 1 for users + N for each user's posts
+```
+
+**Good**:
+```typescript
+const users = await db.query.users.findMany({
+  with: {
+    posts: true, // All posts loaded in single query
+  },
+});
+```
+
+**Reference**: `/docs/database.md#relationships`
+
+---
+
+## Documentation Decisions
+
+### DECIDED: Comprehensive Documentation Structure
+
+**Decision**: Create 8 documentation files covering all aspects of the project.
+
+**Files**:
+1. `/docs/project-structure.md` - Architecture & file organization (this doc)
+2. `/docs/exceptions.md` - Exception handling best practices (600+ lines)
+3. `/docs/testing.md` - Jest/unit/integration/E2E testing standards (500+ lines)
+4. `/docs/environment.md` - Environment variables & configuration
+5. `/docs/api.md` - API endpoints, status codes, examples
+6. `/docs/database.md` - Drizzle schema, migrations, seeding
+7. `/docs/patterns.md` - Common code patterns & templates
+8. `/docs/findings.md` - This file, decisions & discoveries
+
+**Benefits**: Single source of truth for all patterns, reduced duplication, easy onboarding.
+
+---
+
+## Open Questions & Future Decisions
+
+1. **Caching Strategy**: Should we implement Redis caching for frequently accessed data?
+2. **Event Sourcing**: Should we implement event sourcing for audit trails?
+3. **GraphQL**: Should we add GraphQL alongside REST API?
+4. **Microservices**: Should we split into microservices as app grows?
+
+---
+
+## Lessons Learned
+
+1. ✅ Clear decorator order prevents bugs and improves readability
+2. ✅ Strict layering (controller → service → repository) makes code testable and maintainable
+3. ✅ DTOs protect API contracts from internal schema changes
+4. ✅ Documentation reduces onboarding time and prevents mistakes
+5. ✅ Path aliases make code more readable than relative paths
+6. ✅ Comprehensive exception handling improves security and UX
+7. ✅ Type safety catches errors at compile time, not runtime
+8. ✅ Pagination metadata improves UX and performance
+
+---
+
+## Contributors
+
+- Initial Setup: April 7, 2026
+- Architecture Expansion: April 7, 2026
+
+---
+
+## References
+
+- [Project Structure](./project-structure.md)
+- [Exception Handling](./exceptions.md)
+- [Testing Standards](./testing.md)
+- [Environment Configuration](./environment.md)
+- [API Documentation](./api.md)
+- [Database Schema](./database.md)
+- [Code Patterns](./patterns.md)
 

@@ -109,12 +109,53 @@ When planning a feature:
 - API response structures
 - Error handling patterns
 - Type definitions
+- That type packages (@types/*) are installed
 
 ✅ **Always verify from:**
 - Official documentation
 - Library's own examples
 - TypeScript type definitions
 - Recent version's releases/changelogs
+- package.json for required @types packages
+
+### Import Type vs Runtime Distinction
+⚠️ **Critical for TypeScript Strict Mode + emitDecoratorMetadata:**
+
+When using `@Inject` with decorated constructors, distinguish carefully:
+
+**Type-only imports** (for types only, erased at runtime):
+```typescript
+// ✅ CORRECT: Use import type when only needed for typing
+import type { Database } from './database.module';
+
+@Injectable()
+export class MyService {
+  constructor(@Inject(TOKEN) private db: Database) {}  // Type annotation only
+}
+```
+
+**Runtime imports** (used with new operator or assignments):
+```typescript
+// ✅ CORRECT: Regular import for runtime values
+import { Pool } from 'pg';  // Used with: new Pool({...})
+
+// ✅ CORRECT: Type-only for types
+import type { PoolClient } from 'pg'; // Used only for typing: client: PoolClient
+```
+
+**Error to avoid (TS1272)**:
+```typescript
+// ❌ WRONG: Decorated signature with regular import causes TS1272
+import { Database } from './database.module';
+
+@Injectable()
+export class MyService {
+  constructor(@Inject(TOKEN) private db: Database) {}  // Error TS1272
+}
+
+// ✅ FIX: Use import type for decorated signatures
+import type { Database } from './database.module';
+```
 
 ## Code Standards
 
@@ -131,37 +172,60 @@ src/
 ├── modules/           # Feature modules
 │   ├── users/
 │   │   ├── users.module.ts
-│   │   ├── users.service.ts
 │   │   ├── users.controller.ts
+│   │   ├── users.service.ts
+│   │   ├── users.repository.ts
 │   │   ├── dto/
-│   │   │   ├── create-user.dto.ts
-│   │   │   └── update-user.dto.ts
 │   │   ├── entities/
-│   │   │   └── user.entity.ts
-│   │   └── users.repository.ts
+│   │   ├── enums/
+│   │   ├── exceptions/
+│   │   ├── factories/
+│   │   ├── interfaces/
+│   │   ├── processors/
+│   │   ├── services/
+│   │   ├── validators/
+│   │   └── [*.spec.ts tests]
 │   └── products/
-├── common/            # Shared/common functionality
-│   ├── decorators/
-│   ├── filters/
-│   ├── guards/
-│   ├── interceptors/
-│   ├── middleware/
-│   ├── pipes/
-│   └── utils/
+├── common/            # Shared/reusable code
+│   ├── bases/         # Base classes
+│   ├── constants/     # App constants
+│   ├── decorators/    # Custom decorators
+│   ├── exceptions/    # Custom exceptions
+│   ├── factories/     # Object factories
+│   ├── filters/       # Exception filters
+│   ├── guards/        # Route guards
+│   ├── interceptors/  # HTTP interceptors
+│   ├── interfaces/    # TypeScript interfaces
+│   ├── middlewares/   # Express middleware
+│   ├── pipes/         # Validation pipes
+│   ├── processors/    # Background job processors
+│   ├── utils/         # Utility functions
+│   ├── validators/    # Custom validators
+│   └── common.module.ts
 ├── database/          # Database configuration
 │   ├── drizzle/
 │   │   ├── schema.ts
 │   │   └── migrations/
+│   ├── seeds/
 │   └── database.module.ts
 ├── config/            # Configuration
 │   ├── database.config.ts
 │   ├── app.config.ts
 │   └── validation.ts
+├── types/             # TypeScript types
+├── generated/         # Generated code (DO NOT EDIT)
 ├── app.module.ts
 ├── app.controller.ts
 ├── app.service.ts
 └── main.ts
 ```
+
+**See `/docs/project-structure.md` for complete details on:**
+- All folder purposes (decorators, entities, enums, exceptions, factories, filters, guards, pipes, interceptors, interfaces, middlewares, processors, repositories, services, utils, validations, bases, constants)
+- File organization patterns
+- Decorator order for classes and methods
+- Path aliases (20+ aliases)
+- Data flow diagrams
 
 ### Decorator Order (NestJS Classes)
 ```typescript
@@ -182,21 +246,276 @@ Order: `@Controller / @Module / @Injectable` → `@UseInterceptors` → `@UseGua
 ### Path Aliases (tsconfig.json)
 ```json
 "paths": {
+  "@app/*": ["src/*"],
   "@/*": ["src/*"],
   "@modules/*": ["src/modules/*"],
   "@common/*": ["src/common/*"],
   "@database/*": ["src/database/*"],
   "@config/*": ["src/config/*"],
-  "@types/*": ["src/types/*"]
+  "@types/*": ["src/types/*"],
+  "@decorators/*": ["src/common/decorators/*"],
+  "@exceptions/*": ["src/common/exceptions/*"],
+  "@filters/*": ["src/common/filters/*"],
+  "@guards/*": ["src/common/guards/*"],
+  "@interceptors/*": ["src/common/interceptors/*"],
+  "@middlewares/*": ["src/common/middlewares/*"],
+  "@pipes/*": ["src/common/pipes/*"],
+  "@validators/*": ["src/common/validators/*"],
+  "@utils/*": ["src/common/utils/*"],
+  "@interfaces/*": ["src/common/interfaces/*"],
+  "@constants/*": ["src/common/constants/*"],
+  "@factories/*": ["src/common/factories/*"],
+  "@bases/*": ["src/common/bases/*"],
+  "@migrations/*": ["src/database/migrations/*"],
+  "@generated/*": ["src/generated/*"],
+  "@test/*": ["test/*"]
 }
 ```
 
 ### Type Safety Rules
 - **No implicit `any`**: `strictNullChecks: true`, `noImplicitAny: true`
 - **DTOs**: Always use Data Transfer Objects for request/response bodies
+  - Use TypeScript non-null assertion operator `!` for required DTO properties with initializers
+  - Example: `email!: string;` (tells TypeScript this is required and will be initialized via deserialization)
+  - Optional properties use `?`: `description?: string;`
+  - Never declare required DTO properties without `!` or a default initializer
 - **Entities**: Separate from DTOs. Use proper typing for database entities.
 - **Return Types**: Always specify explicit return types for functions/methods
 - **Errors**: Use custom exception classes extending `HttpException`
+
+## Package Management & Dependencies
+
+### Drizzle ORM + PostgreSQL
+
+#### Required Dependencies
+- `drizzle-orm` - ORM framework
+- `pg` - PostgreSQL client driver (required by Drizzle)
+- `@neondatabase/serverless` - NeonDB serverless adapter
+- `drizzle-kit` - CLI for migrations (devDependency)
+
+#### Standard Drizzle ORM Practices
+
+**1. Schema-First Approach**
+- Define ALL tables and relations in `src/database/drizzle/schema.ts`
+- This is the single source of truth for database structure
+- Seed data constants should be in the schema file, not service files
+- Use `export type` with `$inferSelect` and `$inferInsert` for type safety
+
+```typescript
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+
+export const SEED_DATA: NewUser[] = [{ email: '...', /* ... */ }];
+```
+
+**2. Database Module Typing**
+- Import schema as namespace: `import * as schema from './drizzle/schema'`
+- Pass schema to drizzle: `drizzle(pool, { schema })`
+- Export typed Database: `export type Database = NodePgDatabase<typeof schema>;`
+- Provides full IDE autocomplete and compile-time validation
+
+```typescript
+export type Database = NodePgDatabase<typeof schema>;
+
+const db = drizzle(pool, { schema });
+return db as Database;
+```
+
+**3. Service Injection**
+- Inject Database as typed provider: `@Inject(DATABASE_PROVIDER) private db: Database`
+- All queries are type-safe and validated
+- No `any` types needed
+
+**4. Seed Data Management**
+- Define seed data in schema.ts: `export const SEED_USERS: NewUser[] = [...]`
+- Import and use in seed service
+- Make seeding idempotent (check before inserting)
+- Respect foreign key constraints (delete in reverse order)
+
+**5. Query Security**
+- Always verify** `pg` and `@neondatabase/serverless` are in package.json before using Drizzle
+- **Database connection**: Pass schema to drizzle for type inference
+- **NEVER hardcode URLs**: Always use `process.env.DATABASE_URL` with runtime validation
+- Use typed queries (no raw SQL unless necessary)
+- Use `sql` helper for raw queries when needed
+
+## Environment Variables Management
+
+### ⚠️ CRITICAL RULE: Never Hardcode Environment-Dependent Values
+
+**Forbidden Examples**:
+```typescript
+❌ const DATABASE_URL = 'postgresql://user:pass@localhost:5432/db';
+❌ const API_KEY = 'sk-1234567890abcdef';
+❌ const SMTP_PASSWORD = 'mySecurePassword123';
+❌ const PORT = 3000;
+❌ const FRONTEND_URL = 'http://localhost:3000';
+❌ const LOG_LEVEL = 'debug';
+```
+
+**Correct Approach**:
+```typescript
+✅ const DATABASE_URL = process.env.DATABASE_URL;
+✅ const API_KEY = process.env.API_KEY;
+✅ const SMTP_PASSWORD = process.env.SMTP_PASSWORD;
+✅ const PORT = process.env.PORT || 3000;
+✅ const FRONTEND_URL = process.env.FRONTEND_URL;
+✅ const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
+```
+
+### Environment Variable Documentation
+
+**For EVERY new environment variable used in code:**
+
+1. **Update `.env.example`** — Template with placeholder values
+   ```bash
+   DATABASE_URL=postgresql://user:password@host:5432/dbname
+   API_KEY=your-api-key-here
+   SMTP_PASSWORD=your-email-password
+   PORT=3000
+   FRONTEND_URL=http://localhost:3000
+   LOG_LEVEL=info
+   ```
+
+2. **Document in `/docs/environment.md`** — Complete reference including:
+   - Variable name
+   - Description
+   - Required (yes/no)
+   - Default value
+   - Example value
+   - When it's used
+   - Security notes (if sensitive)
+
+3. **Create validation schema** (if using @nestjs/config):
+   ```typescript
+   export const envSchema = Joi.object({
+     DATABASE_URL: Joi.string().required(),
+     API_KEY: Joi.string().required(),
+     PORT: Joi.number().default(3000),
+   });
+   ```
+
+### Environment Variable Categories
+
+**Secrets** (sensitive, never commit):
+- API keys, passwords, tokens
+- Database credentials
+- Private keys
+- JWT secrets
+- **Action**: Add to `.gitignore`, document in `.env.example` without real values
+
+**Configuration** (varies by environment):
+- Database URL
+- URLs (frontend, API endpoints)
+- Feature flags
+- Log levels
+- Timeouts, retries
+- **Action**: Different values per (dev, staging, prod)
+
+**Constants** (rarely change):
+- PORT, MAX_RETRIES, TIMEOUT
+- **Action**: Use ENV vars with sensible defaults: `process.env.PORT || 3000`
+
+### Runtime Validation
+
+**ALWAYS validate environment variables at startup:**
+
+```typescript
+// src/config/validation.ts
+function validateEnvironment() {
+  const required = ['DATABASE_URL', 'API_KEY', 'JWT_SECRET'];
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    throw new Error(`Missing required env vars: ${missing.join(', ')}`);
+  }
+}
+
+// src/main.ts
+validateEnvironment();
+const app = await NestFactory.create(AppModule);
+```
+
+**In modules/services:**
+```typescript
+@Injectable()
+export class DatabaseService {
+  constructor() {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL environment variable is not set. Check your .env file.');
+    }
+    // Use DATABASE_URL safely
+  }
+}
+```
+
+### Multi-Environment Setup
+
+**Files**:
+- `.env` — Development (git-ignored)
+- `.env.example` — Template (in git)
+- `.env.staging` — Staging (in pipeline)
+- `.env.production` — Production (in secrets manager)
+
+**Load correct env file**:
+```typescript
+const envFile = `.env.${process.env.NODE_ENV || 'development'}`;
+require('dotenv').config({ path: envFile });
+```
+
+**Documentation hierarchy**:
+1. `.env.example` shows what vars are needed
+2. `/docs/environment.md` documents each variable
+3. Runtime validation ensures nothing is missing
+
+### Common Mistakes to Avoid
+
+❌ **Mistake 1**: Checking in `.env` with real values
+✅ **Fix**: Add `.env` to `.gitignore`, always commit `.env.example`
+
+❌ **Mistake 2**: Using env vars without validation
+✅ **Fix**: Validate all required vars at startup
+
+❌ **Mistake 3**: Hardcoding URLs/keys with "defaults"
+✅ **Fix**: Everything comes from process.env, with defaults only for non-critical values
+
+❌ **Mistake 4**: Forgetting to document new env vars
+✅ **Fix**: Update `.env.example` AND `/docs/environment.md` with every new var
+
+❌ **Mistake 5**: Different env var names in code vs documentation
+✅ **Fix**: Keep names consistent, document all variations
+
+#### Migration Workflow
+
+```bash
+# 1. Update schema in src/database/drizzle/schema.ts
+# 2. Generate migration (creates file in migrations/)
+pnpm run db:generate
+
+# 3. Review generated migration
+# 4. Run migration against database
+pnpm run db:migrate
+
+# 5. Seed test data (optional)
+pnpm run db:seed
+
+# 6. Open Drizzle Studio to verify
+pnpm run db:studio
+```
+
+### Swagger/OpenAPI Configuration
+- **Important**: Check method signatures for `DocumentBuilder` methods
+  - `.setContact(name: string, url: string, email: string)` - Requires 3 separate string arguments, NOT an object
+  - `.setLicense(name: string, url: string)` - Requires 2 string arguments
+  - `.setSecurity(name: string, scheme: SecuritySchemeObject)` - Different from others
+- **Always verify** @nestjs/swagger version in package.json and check official docs for method signatures
+- **Common mistake**: Passing objects to methods that expect separate arguments
 
 ## Workflow for Agent Tasks
 
@@ -233,6 +552,33 @@ Order: `@Controller / @Module / @Injectable` → `@UseInterceptors` → `@UseGua
 
 ## Documentation Files
 
+### /docs/testing.md
+**CRITICAL FOR TESTING**: Industry-standard Jest guidelines covering:
+- Unit testing (services, controllers, repositories)
+- Integration testing with real DB interactions
+- E2E testing (critical paths only)
+- Mocking strategies for consistency
+- Edge cases and error handling
+- Test isolation patterns
+- Coverage standards (70-90% target)
+- Endpoint testing workflow (tests first!)
+- JSON response validation
+- HTTP status code verification
+- DTO validation patterns
+
+### /docs/exceptions.md
+**CRITICAL FOR ERROR HANDLING**: Best practices for exception management:
+- Custom exception hierarchy (BaseException pattern)
+- Built-in HTTP exceptions (400, 401, 403, 404, 409, 500, 503)
+- Exception filters (global error catching)
+- Error response format (safe, no stack traces)
+- Stack trace management (logged internally only)
+- Logging best practices (what to log, what to hide)
+- Try-catch patterns (service, controller, repository layers)
+- Common error scenarios with code examples
+- Testing exception handling
+- **CRITICAL**: Never leak stack traces to client
+
 ### /docs/findings.md
 Auto-updating log of:
 - Wide repository searches and findings
@@ -241,11 +587,15 @@ Auto-updating log of:
 - Architecture decisions
 
 ### /docs/project-structure.md
-Visual guide including:
-- Directory tree with descriptions
-- Module relationships
-- Database schema overview
-- Key architectural patterns
+Complete architecture guide including:
+- Full directory structure (300+ lines)
+- Module organization (common, features)
+- File organization by type (DTOs, entities, exceptions, etc.)
+- Decorator order for classes and methods
+- Path aliases reference (20+ aliases)
+- Naming conventions
+- Data flow diagrams
+- Best practices
 
 ### /docs/api.md
 - API endpoints and DTOs
@@ -256,6 +606,12 @@ Visual guide including:
 - Drizzle schema explanation
 - Migration procedures
 - NeonDB connection details
+
+### /docs/environment.md
+- All environment variables documented
+- Required vs optional
+- Defaults
+- Security notes
 
 ## pnpm Scripts (Standard)
 ```bash
@@ -325,6 +681,9 @@ Enforce at compilation:
 5. **No God classes**: Split large modules
 6. **Interface-based**: Use interfaces for contracts
 7. **Services as singletons**: Leverage NestJS provider pattern
+8. **⚠️ NEVER hardcode environment values**: All URLs, keys, secrets, ports from process.env with validation
+9. **Environment documentation**: Every env var in code must be in `.env.example` and `/docs/environment.md`
+10. **Runtime validation**: Validate all required env vars at application startup
 
 ## When Stuck or Creating New Features
 
@@ -336,6 +695,85 @@ Enforce at compilation:
 5. **Check TypeScript types** — Review type definitions for safety
 6. **Document findings** — Record discoveries in `/docs/findings.md`
 7. **Plan implementation** — Design based on verified docs, not assumptions
+8. **Check environment requirements** — If feature needs new config/secrets, document in `.env.example` and `/docs/environment.md`
+
+### Testing-First Approach for Endpoints
+
+**ALWAYS generate unit tests BEFORE implementation:**
+
+1. **Plan the endpoint** — Method, path, request/response structure
+2. **Write unit tests FIRST** — Controller, service, repository tests (follow `/docs/testing.md`)
+3. **Write the implementation** — Make tests pass
+4. **Add E2E test ONLY if critical** (not all endpoints)
+5. **Validate response structure** — JSON format, HTTP status codes
+6. **Verify coverage** — Run `pnpm run test:cov`, aim for 70%+ service/controller
+
+### Endpoint Testing Checklist
+
+When adding new endpoint:
+- [ ] Read `/docs/testing.md` for patterns and examples
+- [ ] Write controller.spec.ts tests (test happy path + errors)
+- [ ] Write service.spec.ts tests (mock repository, test business logic)
+- [ ] Write repository.spec.ts tests (mock DB, test queries)
+- [ ] Write DTO validation tests if complex validation
+- [ ] Run tests: `pnpm run test`
+- [ ] Add E2E test ONLY if critical endpoint (authentication, payments, etc.)
+- [ ] E2E test validates: status code + JSON response structure
+- [ ] E2E test validates: error responses with proper status + JSON format
+- [ ] No E2E tests needed for: helper endpoints, non-critical reads, etc.
+- [ ] Run E2E tests: `pnpm run test:e2e`
+- [ ] Check coverage: `pnpm run test:cov`
+
+### Response Structure Validation (E2E)
+
+Always validate JSON response structure in E2E tests:
+
+```typescript
+// ✅ Validate successful response
+const response = await request(app.getHttpServer())
+  .post('/endpoint')
+  .send(payload)
+  .expect(201);
+
+expect(response.body).toEqual(
+  expect.objectContaining({
+    id: expect.any(Number),
+    email: expect.any(String),
+    createdAt: expect.any(String),
+    // ... all expected fields
+  })
+);
+
+// ✅ Validate error response
+const error = await request(app.getHttpServer())
+  .post('/endpoint')
+  .send(invalidPayload)
+  .expect(400);
+
+expect(error.body).toEqual(
+  expect.objectContaining({
+    statusCode: 400,
+    message: expect.any(String),
+    error: 'Bad Request',
+  })
+);
+```
+
+### E2E Test Guidelines
+
+**Critical endpoints** (add E2E tests):
+- Authentication (login, logout, refresh)
+- User creation (business-critical)
+- Payment processing (business-critical)
+- Core business workflows
+
+**Non-critical endpoints** (skip E2E, unit test only):
+- Utility endpoints
+- Helper getters
+- Non-essential reads
+- Non-critical updates
+
+**Rule**: One happy path + main error scenario per critical endpoint. Do NOT test every combination.
 
 **Standard Checklist:**
 1. Check `/docs/findings.md` for previous decisions
