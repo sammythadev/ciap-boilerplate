@@ -1,60 +1,17 @@
 {
   "$schema": "https://json.schemastore.org/swcrc.schema.json",
-  "env": {
-    "targets": {
-      "node": "20"
-    }
-  },
   "jsc": {
     "parser": {
       "syntax": "typescript",
-      "decorators": true,
-      "decoratorsBeforeExport": true,
-      "dynamicImport": true,
-      "classProperties": true,
-      "classPrivateProperties": true,
-      "classPrivateMethods": true,
-      "privateMethod": true,
-      "topLevelAwait": true
+      "decorators": true
     },
     "target": "es2021",
-    "baseUrl": "./",
-    "paths": {
-      "@/*": ["src/*"],
-      "@modules/*": ["src/modules/*"],
-      "@common/*": ["src/common/*"],
-      "@database/*": ["src/database/*"],
-      "@config/*": ["src/config/*"],
-      "@types/*": ["src/types/*"]
-    },
     "transform": {
-      "decoratorMetadata": true,
-      "legacyDecorator": true
-    },
-    "externalHelpers": true,
-    "keepClassNames": true
+      "decoratorMetadata": true
+    }
   },
   "module": {
-    "type": "commonjs",
-    "ignoreDynamic": false,
-    "noInterop": false,
-    "strict": false,
-    "strictMode": true,
-    "lazy": false
+    "type": "commonjs"
   },
-  "minify": false,
-  "sourceMaps": true,
-  "inlineSourcesContent": true,
-  "exclude": [
-    "node_modules",
-    "dist",
-    "coverage",
-    "test",
-    "logs",
-    "keys",
-    "src/metadata.ts",
-    "**/*spec.ts",
-    "**/*test.ts",
-    "**/*.d.ts"
-  ]
+  "sourceMaps": true
 }

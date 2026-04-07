@@ -1,8 +1,8 @@
 {
-  "name": "test-api",
+  "name": "CIAP",
   "version": "0.0.1",
-  "description": "CIAP ",
-  "author": "",
+  "description": "Creative Influence and Analytics Platform for SMEs and creators ",
+  "author": "group2",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "typecheck:watch": "tsc --noEmit --watch",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "deadcode": "ts-prune --project tsconfig.json",
     "start": "nest start",
     "start:dev": "nest start --watch --config nest-cli.json",
     "start:debug": "nest start --debug --watch",
@@ -54,7 +55,8 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^4.6.3",
-    "typeorm": "^0.3.28"
+    "typeorm": "^0.3.28",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -87,32 +89,28 @@
     "ts-jest": "^29.2.5",
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
+    "ts-prune": "^0.10.3",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
   },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "packagemanager": "pnpm@10.33.0",
-    "engines": {
-      "npm": "please-use-pnpm",
-      "yarn": "please-use-pnpm",
-      "node": ">= 24.11.0",
-      "pnpm": ">= 10.25.0"
-    },
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
-  }
+ "packageManager": "pnpm@10.33.0",
+"engines": {
+  "npm": "please-use-pnpm",
+  "yarn": "please-use-pnpm",
+  "node": ">= 24.11.0",
+  "pnpm": ">= 10.25.0"
+},
+"jest": {
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "src",
+  "testRegex": ".*\\.spec\\.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "collectCoverageFrom": ["**/*.(t|j)s"],
+  "coverageDirectory": "../coverage",
+  "testEnvironment": "node"
+}
+
 }
