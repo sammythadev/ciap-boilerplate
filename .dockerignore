@@ -1,0 +1,30 @@
+# Dependencies and package manager cache
+node_modules
+.pnpm-store
+
+# Build artifacts and logs
+dist
+coverage
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# VCS and editor files
+.git
+.github
+.vscode
+.idea
+
+# Docs and task tracking not needed in image build context
+docs
+agent-docs
+tasks
+
+# OS files
+.DS_Store
+Thumbs.db

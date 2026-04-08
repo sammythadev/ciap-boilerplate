@@ -1,0 +1,194 @@
+name: ciap-nestjs-boilerplate
+
+services:
+  # -----------------------------
+  # NestJS API service
+  # -----------------------------
+  apis:
+    build:
+      context: .
+      dockerfile: dockerfile
+    hostname: apis
+    container_name: ciap-apis
+    restart: on-failure
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - HOST=0.0.0.0
+      - PORT=${APP_PORT:-3000}
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ciap}:${POSTGRES_PASSWORD:-ciap_dev_password}@postgres:5432/${POSTGRES_DB:-ciap}?sslmode=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_dev_password}@redis:${REDIS_PORT:-6379}
+      - BULLMQ_PREFIX=${BULLMQ_PREFIX:-Queue}
+      - JWT_ACCESS_PRIVATE_KEY=${JWT_ACCESS_PRIVATE_KEY:-}
+      - JWT_ACCESS_PUBLIC_KEY=${JWT_ACCESS_PUBLIC_KEY:-}
+      - JWT_REFRESH_PRIVATE_KEY=${JWT_REFRESH_PRIVATE_KEY:-}
+      - JWT_REFRESH_PUBLIC_KEY=${JWT_REFRESH_PUBLIC_KEY:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:3000/auth/google/callback}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - ./src:/app/src
+      - ./.env:/app/.env:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    profiles: ["apis"]
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 768M
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+    networks:
+      - app-network
+
+  # -----------------------------
+  # Redis queue backend
+  # -----------------------------
+  redis:
+    image: redis:7.4-alpine
+    hostname: redis
+    container_name: ciap-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-redis_dev_password}"]
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis_dev_password}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.2"
+          memory: 64M
+    networks:
+      - app-network
+
+  # -----------------------------
+  # Bull Board dashboard
+  # -----------------------------
+  redis-bullboard:
+    image: venatum/bull-board:latest
+    hostname: redis-bullboard
+    container_name: ciap-redis-bullboard
+    restart: unless-stopped
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis_dev_password}
+      - REDIS_DB=${BULLBOARD_REDIS_DB:-0}
+      - BULL_PREFIX=${BULLMQ_PREFIX:-Queue}
+      - USER_LOGIN=${BULLBOARD_USER_LOGIN:-admin}
+      - USER_PASSWORD=${BULLBOARD_USER_PASSWORD:-admin123}
+    ports:
+      - "${BULLBOARD_PORT:-3010}:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: 128M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+    networks:
+      - app-network
+
+  # -----------------------------
+  # PostgreSQL database
+  # -----------------------------
+  postgres:
+    image: postgres:17-alpine
+    hostname: postgres
+    container_name: ciap-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-ciap}
+      - POSTGRES_USER=${POSTGRES_USER:-ciap}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-ciap_dev_password}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ciap} -d ${POSTGRES_DB:-ciap}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    networks:
+      - app-network
+
+volumes:
+  # Persistent database storage
+  postgres_data:
+    name: ciap-postgres-data
+
+  # Persistent Redis data storage
+  redis_data:
+    name: ciap-redis-data
+
+networks:
+  app-network:
+    driver: bridge
+    internal: true

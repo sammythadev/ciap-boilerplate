@@ -24,6 +24,71 @@ Use this file to keep substantial tasks planned, tracked, and closed out.
 
 ## Active / Recent Tasks
 
+## Task: Compose env-list style + CIAP naming + Postgres persistence polish
+
+- Date: 2026-04-08
+- Request: Use `- KEY=value` compose environment style, remove `ack` naming, and ensure persistent Postgres volume setup.
+- Plan:
+  - [x] Convert compose environment sections to list style.
+  - [x] Rename stack/service container names from `ack` to `ciap`.
+  - [x] Ensure persistent named volume configuration for Postgres.
+  - [x] Re-verify project compiles.
+- Progress:
+  - Converted `environment` blocks in compose to `- KEY=value` style across API/Redis/Bull Board/Postgres.
+  - Updated top-level project name to `ciap-nestjs-boilerplate`.
+  - Replaced remaining `ack-*` container names with `ciap-*`.
+  - Added explicit named persistent volumes (`ciap-postgres-data`, `ciap-redis-data`).
+  - Kept service structure and comments clean without copying the full sample stack.
+- Verification:
+  - Tests: `cmd /c pnpm run typecheck` (pass)
+  - Logs / errors: no TypeScript errors after compose/dockerfile refinement.
+- Result:
+  - Completed requested compose style cleanup, CIAP naming alignment, and persistent volume setup.
+
+## Task: Docker compose style cleanup + Dockerfile pattern alignment
+
+- Date: 2026-04-08
+- Request: Reformat compose using the provided style (clear comments/spacing) and align Dockerfile structure with the shared pattern.
+- Plan:
+  - [x] Rewrite `docker-compose.yml` with clean grouped comments and spacing.
+  - [x] Align `dockerfile` with requested pattern.
+  - [x] Sync env template variables used by compose.
+  - [x] Verify project typecheck still passes.
+- Progress:
+  - Updated compose to top-level project name `ack-nestjs-boilerplate` and renamed API service to `apis` with readable sectioned comments.
+  - Kept stack aligned to this repo runtime (`apis`, `postgres`, `redis`, `redis-bullboard`) while preserving health checks and resource limits.
+  - Replaced Dockerfile with requested single-stage pnpm dev-style pattern and added cache-friendly manifest copy order.
+  - Added bull-board auth/db env variables to `.env.example`.
+- Verification:
+  - Tests: `cmd /c pnpm run typecheck` (pass)
+  - Logs / errors: compose runtime validation not executed in this environment.
+- Result:
+  - Compose and Dockerfile now follow the requested visual/style pattern and remain consistent with current project dependencies.
+
+## Task: Containerization baseline (Dockerfile + Compose stack)
+
+- Date: 2026-04-08
+- Request: Create secure multi-stage Docker build for pnpm NestJS app and production-ready docker-compose with app, Postgres, Redis, and Bull Board service, including internal networking, env wiring, health checks, and resource limits.
+- Plan:
+  - [x] Inspect existing scripts/env/docs and identify runtime requirements.
+  - [x] Create `dockerfile` and `.dockerignore` with multi-stage secure build strategy.
+  - [x] Create `docker-compose.yml` with app + postgres + redis + bull board, health checks, internal network, and limits.
+  - [x] Update env template/docs for compose variables and run validation checks.
+  - [x] Record findings and close task with verification notes.
+- Progress:
+  - Confirmed repo uses pnpm-only workflow and production start command is `pnpm run start:prod`.
+  - Confirmed current env docs do not include Redis/Bull Board/Postgres container variables yet.
+  - Added hardened multi-stage `dockerfile` (deps/build/prod-deps/runtime) with non-root runtime and health check.
+  - Added `.dockerignore` entries to keep secrets and heavy/unneeded paths out of Docker build context.
+  - Added `docker-compose.yml` with app/postgres/redis/redis-bullboard, health checks, internal bridge network, and resource limits.
+  - Extended `.env.example` and `docs/environment.md` with compose runtime variables and quick-start guidance.
+  - Recorded containerization baseline in `agent-docs/findings.md`.
+- Verification:
+  - Tests: `cmd /c pnpm run typecheck` (pass)
+  - Logs / errors: `docker compose config` could not be executed because Docker CLI is not installed in this environment (`docker` command not found).
+- Result:
+  - Completed requested Docker + Compose containerization scaffolding with secure defaults and production-oriented service configuration.
+
 ## Task: Runtime wiring + Swagger accuracy fixes
 
 - Date: 2026-04-08

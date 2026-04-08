@@ -64,3 +64,9 @@ Append-only notes for discoveries, decisions, and gotchas.
 - Context: Security hardening and multitenancy enforcement were added after initial auth baseline.
 - Finding: Access tokens now use ES256 and refresh tokens use ES512 with key pairs from env; session lifecycle moved to a dedicated `SessionsModule`; users are tenant-scoped and ability checks are enforced through `RequireAbilities` + `AbilitiesGuard`; Google sign-in uses `google-auth-library` and links identities in `oauth_accounts`.
 - Impact: Environments must provide asymmetric JWT key material (`JWT_ACCESS_*`, `JWT_REFRESH_*`) and OAuth callback settings; tenant-aware endpoints should use request user tenant context by default unless explicitly admin-global.
+
+## Container Runtime Baseline (2026-04-08)
+
+- Context: Production-style containerization was added for local/prod parity.
+- Finding: The repository now uses a multi-stage pnpm Docker build (`dockerfile`) and a compose stack with `api`, `postgres`, `redis`, and `redis-bullboard` on a dedicated internal bridge network.
+- Impact: Local container startup should prefer `docker compose up --build` with env-driven `DATABASE_URL`, Redis settings, and JWT key variables instead of hardcoded service credentials.
