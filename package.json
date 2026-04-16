@@ -22,6 +22,8 @@
     "start:prod": "node dist/main",
     "lint": "eslint .",
     "lint-fix": "eslint --fix",
+    "lint:staged": "lint-staged",
+    "commitlint": "commitlint --edit",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
@@ -122,8 +124,7 @@
   },
   "lint-staged": {
     "**/*.ts": [
-      "eslint",
-      "stop-only --file"
+      "eslint --fix"
     ],
     "*.{json,yaml}": [
       "prettier --write"

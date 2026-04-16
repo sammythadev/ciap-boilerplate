@@ -24,6 +24,24 @@ Use this file to keep substantial tasks planned, tracked, and closed out.
 
 ## Active / Recent Tasks
 
+## Task: Wire commit hooks and lint-staged
+
+- Date: 2026-04-16
+- Request: Wire Commitlint + lint-staged via Husky and correct scripts/hooks.
+- Plan:
+  - [x] Ensure Husky hooks include the required shim and target commands.
+  - [x] Add missing package.json scripts for lint-staged and commitlint.
+  - [x] Fix lint-staged config to only use installed tooling.
+- Progress:
+  - Added Husky hook shims and ensured commands run through Husky.
+  - Added `lint:staged` and `commitlint` scripts.
+  - Removed the non-existent `stop-only` command from lint-staged.
+- Verification:
+  - Tests: not run (hook wiring change only)
+  - Logs / errors: not checked
+- Result:
+  - Completed. Commit-msg and pre-commit hooks now run via Husky, with lint-staged/commitlint scripts in place.
+
 ## Task: Modularize AuthService for readability
 
 - Date: 2026-04-16
