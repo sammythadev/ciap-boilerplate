@@ -15,8 +15,14 @@ describe('AppController', () => {
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('should return API info', () => {
+      const result = appController.getInfo();
+      expect(result).toEqual(
+        expect.objectContaining({
+          name: 'CIAP',
+          version: '0.0.1',
+        }),
+      );
     });
   });
 });

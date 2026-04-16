@@ -15,12 +15,18 @@ describe('AppController (e2e)', () => {
     app = moduleFixture.createNestApplication();
     await app.init();
   });
-
   it('/ (GET)', () => {
     return request(app.getHttpServer())
       .get('/')
       .expect(200)
-      .expect('Hello World!');
+      .expect((response) => {
+        expect(response.body).toEqual(
+          expect.objectContaining({
+            name: 'CIAP',
+            version: '0.0.1',
+          }),
+        );
+      });
   });
 
   afterEach(async () => {

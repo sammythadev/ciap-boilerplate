@@ -24,6 +24,58 @@ Use this file to keep substantial tasks planned, tracked, and closed out.
 
 ## Active / Recent Tasks
 
+## Task: Update README usage and setup
+
+- Date: 2026-04-16
+- Request: Update README with must-read usage, env setup, tests, scripts, and commit message rules.
+- Plan:
+  - [x] Add a must-read usage section with setup steps.
+  - [x] Document DB, Google OAuth, Redis, and admin env requirements.
+  - [x] Update test and commit message guidance.
+- Progress:
+  - Added setup/usage instructions and commit message rules.
+  - Updated env section for Google/Redis/admin values.
+- Verification:
+  - Tests: not run (docs-only)
+  - Logs / errors: not checked
+- Result:
+  - Completed README refresh for setup and usage guidance.
+
+## Task: Expand Jest config and add critical tests
+
+- Date: 2026-04-16
+- Request: Populate jest-e2e config, add unit tests for critical modules, and include them in config.
+- Plan:
+  - [x] Expand test config to include unit + e2e specs and path aliases.
+  - [x] Add unit tests for health, users, and auth token services.
+  - [x] Align e2e test expectations with current API response.
+- Progress:
+  - Updated jest-e2e config with moduleNameMapper and testMatch.
+  - Added health, users, and auth token unit tests.
+  - Updated app e2e test to assert API info.
+- Verification:
+  - Tests: not run (requested changes only)
+  - Logs / errors: not checked
+- Result:
+  - Completed config updates and critical test coverage additions.
+
+## Task: Fix failing unit tests and Jest aliases
+
+- Date: 2026-04-16
+- Request: Fix failing tests and align application unit tests.
+- Plan:
+  - [x] Align AppController unit test with current controller behavior.
+  - [x] Add Jest path alias mapping to resolve module imports.
+  - [ ] Confirm whether broader test generation is desired before adding new specs.
+- Progress:
+  - Updated AppController test to assert `getInfo()` response.
+  - Added Jest moduleNameMapper entries for repo path aliases.
+- Verification:
+  - Tests: not run (requested fixes only)
+  - Logs / errors: not checked
+- Result:
+  - Completed initial fixes for the reported failures; awaiting scope for additional test creation.
+
 ## Task: Wire commit hooks and lint-staged
 
 - Date: 2026-04-16

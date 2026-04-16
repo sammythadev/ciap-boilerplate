@@ -21,6 +21,7 @@ Production-oriented NestJS v11 API boilerplate for the Creative Influence and An
 ## Table Of Contents
 
 - [Important Notes](#important-notes)
+- [Must Read: Setup And Usage](#must-read-setup-and-usage)
 - [Current Scope](#current-scope)
 - [Prerequisites](#prerequisites)
 - [Built With](#built-with)
@@ -44,6 +45,59 @@ Production-oriented NestJS v11 API boilerplate for the Creative Influence and An
 - Swagger docs are served at `/api-docs`.
 - This project uses `pnpm` exclusively.
 - Exception filters are configured to avoid stack-trace noise for expected `4xx` responses.
+
+## Must Read: Setup And Usage
+
+### 1) Configure Environment
+
+At minimum, set these values in `.env` (see `.env.example` for the template):
+
+- `DATABASE_URL` (PostgreSQL connection string)
+- `JWT_ACCESS_PRIVATE_KEY` / `JWT_ACCESS_PUBLIC_KEY`
+- `JWT_REFRESH_PRIVATE_KEY` / `JWT_REFRESH_PUBLIC_KEY`
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_LOGIN_REDIRECT_URI` and `GOOGLE_YOUTUBE_REDIRECT_URI`
+- `ADMIN_SIGNUP_KEY` (required for `/auth/admin/signup`)
+
+If you are running Redis (local or Docker), configure:
+
+- `REDIS_URL` (example: `redis://:password@localhost:6379/0`)
+- `REDIS_PASSWORD` (required if your Redis instance enforces auth)
+
+### 2) Setup Database
+
+```bash
+pnpm install
+pnpm run db:generate
+pnpm run db:migrate
+```
+
+### 3) Run The App
+
+```bash
+pnpm run start:dev
+```
+
+### 4) Run Tests
+
+```bash
+pnpm run test
+pnpm run test:e2e
+```
+
+`pnpm run test` uses `TZ=UTC` and runs Jest with `test/jest-e2e.json` plus open-handle detection.
+
+### 5) Commit Messages
+
+Commits are validated by Commitlint. Use conventional commits:
+
+```
+feat(auth): add refresh token rotation
+fix(users): handle missing tenant
+docs: update readme
+```
+
+Allowed types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `hotfix`, `perf`, `refactor`, `revert`, `style`, `test`.
 
 ## Current Scope
 
@@ -145,7 +199,11 @@ At minimum configure:
 - `JWT_REFRESH_PUBLIC_KEY`
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
-- `GOOGLE_REDIRECT_URI` (default: `http://localhost:3000/auth/google/callback`)
+- `GOOGLE_LOGIN_REDIRECT_URI` (default: `http://localhost:3000/auth/socials/google/login/callback`)
+- `GOOGLE_YOUTUBE_REDIRECT_URI` (default: `http://localhost:3000/ingestion/youtube/oauth2/callback`)
+- `ADMIN_SIGNUP_KEY`
+- `REDIS_URL` (if running Redis/BullMQ)
+- `REDIS_PASSWORD` (if Redis requires auth)
 
 See [.env.example](./.env.example) for full template.
 
@@ -238,6 +296,8 @@ pnpm run db:seed
 - Unit tests: `pnpm run test`
 - E2E tests: `pnpm run test:e2e`
 - Coverage: `pnpm run test:cov`
+
+Note: `pnpm run test` uses `test/jest-e2e.json` and detects open handles.
 
 ## Roadmap
 

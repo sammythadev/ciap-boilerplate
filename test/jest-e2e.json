@@ -1,9 +1,37 @@
 {
   "moduleFileExtensions": ["js", "json", "ts"],
-  "rootDir": ".",
+  "rootDir": "..",
+  "moduleNameMapper": {
+    "^@/(.*)$": "<rootDir>/src/$1",
+    "^@modules/(.*)$": "<rootDir>/src/modules/$1",
+    "^@common/(.*)$": "<rootDir>/src/common/$1",
+    "^@database/(.*)$": "<rootDir>/src/database/$1",
+    "^@types/(.*)$": "<rootDir>/src/types/$1",
+    "^@bases/(.*)$": "<rootDir>/src/common/bases/$1",
+    "^@decorators/(.*)$": "<rootDir>/src/common/decorators/$1",
+    "^@exceptions/(.*)$": "<rootDir>/src/common/exceptions/$1",
+    "^@filters/(.*)$": "<rootDir>/src/common/filters/$1",
+    "^@guards/(.*)$": "<rootDir>/src/common/guards/$1",
+    "^@interceptors/(.*)$": "<rootDir>/src/common/interceptors/$1",
+    "^@middlewares/(.*)$": "<rootDir>/src/common/middlewares/$1",
+    "^@pipes/(.*)$": "<rootDir>/src/common/pipes/$1",
+    "^@validators/(.*)$": "<rootDir>/src/common/validators/$1",
+    "^@utils/(.*)$": "<rootDir>/src/common/utils/$1",
+    "^@interfaces/(.*)$": "<rootDir>/src/common/interfaces/$1",
+    "^@constants/(.*)$": "<rootDir>/src/common/constants/$1",
+    "^@factories/(.*)$": "<rootDir>/src/common/factories/$1",
+    "^@migrations/(.*)$": "<rootDir>/src/database/drizzle/migrations/$1",
+    "^@generated/(.*)$": "<rootDir>/src/generated/$1",
+    "^@test/(.*)$": "<rootDir>/test/$1"
+  },
+  "testMatch": [
+    "<rootDir>/src/**/*.spec.ts",
+    "<rootDir>/test/**/*.e2e-spec.ts"
+  ],
   "testEnvironment": "node",
-  "testRegex": ".e2e-spec.ts$",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
-  }
+  },
+  "collectCoverageFrom": ["<rootDir>/src/**/*.(t|j)s"],
+  "coverageDirectory": "<rootDir>/coverage"
 }
