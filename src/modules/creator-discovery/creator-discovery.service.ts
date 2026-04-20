@@ -68,21 +68,23 @@ export class CreatorDiscoveryService {
     }>;
 
     if (params.creatorIds?.length) {
-      creators = (await this.repository.getCreatorsByIds(params.creatorIds)).map(
-        (creator) => ({
-          ...creator,
-          audienceSize: creator.audienceSize ?? 0,
-        }),
-      );
+      creators = (
+        await this.repository.getCreatorsByIds(params.creatorIds)
+      ).map((creator) => ({
+        ...creator,
+        audienceSize: creator.audienceSize ?? 0,
+      }));
     } else {
-      creators = (await this.repository.searchCreators({
-        query: params.query,
-        platform: undefined,
-        minInfluenceScore: undefined,
-        maxInfluenceScore: undefined,
-        limit: params.limit,
-        offset: 0,
-      })).map((creator) => ({
+      creators = (
+        await this.repository.searchCreators({
+          query: params.query,
+          platform: undefined,
+          minInfluenceScore: undefined,
+          maxInfluenceScore: undefined,
+          limit: params.limit,
+          offset: 0,
+        })
+      ).map((creator) => ({
         ...creator,
         audienceSize: creator.audienceSize ?? 0,
       }));

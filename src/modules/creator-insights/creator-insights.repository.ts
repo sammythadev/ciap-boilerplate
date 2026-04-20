@@ -54,10 +54,7 @@ export class CreatorInsightsRepository {
         score: youtubeMlScores,
       })
       .from(youtubeVideos)
-      .leftJoin(
-        youtubeMlScores,
-        eq(youtubeMlScores.videoId, youtubeVideos.id),
-      )
+      .leftJoin(youtubeMlScores, eq(youtubeMlScores.videoId, youtubeVideos.id))
       .where(eq(youtubeVideos.channelId, channelId))
       .orderBy(desc(youtubeVideos.publishedAt))
       .limit(limit);

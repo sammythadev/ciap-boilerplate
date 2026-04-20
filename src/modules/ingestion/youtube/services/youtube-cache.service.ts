@@ -112,7 +112,7 @@ export class YoutubeCacheService {
    * Retrieve all cached videos for a channel (by key pattern).
    * Note: Returns empty array in memory-only mode (pattern matching requires Redis).
    */
-  async getChannelVideos(youtubeChannelId: string): Promise<YoutubeVideo[]> {
+  getChannelVideos(youtubeChannelId: string): YoutubeVideo[] {
     // Pattern matching not supported through generic cache-manager interface
     // Would require direct Redis access for KEYS command
     this.logger.debug(
@@ -154,9 +154,7 @@ export class YoutubeCacheService {
     const key = this.getAnalyticsKey(youtubeChannelId);
 
     try {
-      const analytics = await this.redisCache.get<YoutubeDailyAnalytics[]>(
-        key,
-      );
+      const analytics = await this.redisCache.get<YoutubeDailyAnalytics[]>(key);
       return analytics ?? [];
     } catch (error) {
       this.logger.error(

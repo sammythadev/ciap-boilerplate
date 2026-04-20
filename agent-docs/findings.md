@@ -94,3 +94,29 @@ Append-only notes for discoveries, decisions, and gotchas.
 - Context: YouTube metrics endpoints needed to rely on Google OAuth tokens after onboarding without requiring client-supplied Google access tokens.
 - Finding: `GET /auth/socials/google/youtube/metrics` and `GET /ingestion/youtube/metrics` now resolve Google access/refresh tokens from `oauth_accounts` and return actionable `oauth2-link-required` details when missing.
 - Impact: Clients can use only the app JWT once OAuth is linked; YouTube calls no longer accept `x-google-access-token` headers.
+
+## Drizzle onConflictDoUpdate Must Use sql`excluded.*` for Batch Upserts (2026-04-20)
+
+- Context: Multiple repositories used `onConflictDoUpdate({ set: { field: values[0]?.field } })`.
+- Finding: When inserting multiple rows, Drizzle's `onConflictDoUpdate` `set` clause runs once per conflict. Using `values[0]?.field` sets ALL conflicting rows to the first inserted row's data. The correct pattern is `sql\`excluded.column_name\`` to reference each row's own incoming values.
+- Impact: All four upsert repositories had this bug causing silent data overwrite with first-row values. Fixed with `sql\`excluded.*\`` pattern.
+- Follow-up: Review any new `onConflictDoUpdate` code to ensure it uses `sql\`excluded.*\`` for batch operations.
+
+## OAuth2Client Must Not Be Shared Across Concurrent Refresh Calls (2026-04-20)
+
+- Context: `refreshGoogleOauthTokensForUser` mutated a singleton OAuth2Client with `setCredentials()`.
+- Finding: Two concurrent refresh requests share the same client object. `setCredentials()` overwrites credentials on the shared instance; the first caller's `refreshAccessToken()` may execute with the second caller's refresh token (race condition).
+- Impact: Could return wrong access token per user. Fixed by creating a fresh `OAuth2Client` per refresh call.
+- Follow-up: Any future OAuth client usage that calls `setCredentials()` must use a per-request instance.
+
+## isApproved Must Be Persisted in DB, Not Only in Cache (2026-04-20)
+
+- Context: YouTube channel approval (`approveChannel`, `approvePermissions`) only wrote to Redis.
+- Finding: Redis is ephemeral; cache flush loses approval state permanently. Added `isApproved` + `approvedAt` columns to `youtube_channels` table. Migration: `20260420092341_steady_wonder_man.sql`.
+- Impact: Approval is now durable. Re-sync via `upsertChannel` preserves existing approval (not overwritten).
+
+## ForbiddenException vs NotFoundException for Ownership Checks (2026-04-20)
+
+- Context: Ownership checks on YouTube channels threw `NotFoundException` for wrong-user access.
+- Finding: Throwing `NotFoundException` leaks resource existence. For resources the caller has no right to, use `ForbiddenException`.
+- Impact: Changed in `approveChannel` and `approvePermissions`. `NotFoundException` is still correct when the resource genuinely does not exist.

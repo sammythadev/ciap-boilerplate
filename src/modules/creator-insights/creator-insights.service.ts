@@ -41,7 +41,10 @@ export class CreatorInsightsService {
     const since = new Date();
     since.setDate(since.getDate() - (days - 1));
 
-    const analytics = await this.repository.getAnalyticsSince(channel.id, since);
+    const analytics = await this.repository.getAnalyticsSince(
+      channel.id,
+      since,
+    );
 
     const aggregate = analytics.reduce(
       (acc, row) => {

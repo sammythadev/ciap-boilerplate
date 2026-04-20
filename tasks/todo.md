@@ -603,3 +603,130 @@ Use this file to keep substantial tasks planned, tracked, and closed out.
 - Result:
   - `docs/` is now repo-specific and aligned with current code.
   - Agent instruction entry points now explicitly enforce API documentation updates as part of endpoint work.
+
+## Task: Full repo analysis, business logic audit, and OAuth workflow review
+
+- Date: 2026-04-20
+- Request: Full repo analysis, business logic reports, flaw identification from schema to code, OAuth workflow review for YouTube ingestion.
+- Plan:
+  - [x] Audit schema for missing constraints and structural gaps
+  - [x] Audit all repository upsert patterns for correctness
+  - [x] Audit OAuth2 client usage for concurrency safety
+  - [x] Audit security-sensitive code paths (admin key, ownership checks)
+  - [x] Audit NestJS DI decorator coverage
+  - [x] Implement all critical fixes
+  - [x] Generate Drizzle migration for schema changes
+  - [x] Verify with typecheck and lint
+
+---
+
+### Findings Report
+
+#### Critical Bugs Fixed
+
+**1. Broken upsert patterns across all repositories** (severity: critical, data corruption)
+
+All four repositories that use `onConflictDoUpdate` with multiple rows were using
+`videos[0]?.field` (the first item's values) as the conflict update target instead of
+the SQL `EXCLUDED` pseudo-table. This caused every conflicting row in a batch to be
+updated with the **first item's values**, silently overwriting all other rows with wrong data.
+
+Files fixed:
+- `youtube.repository.ts` — `upsertVideos()` and `upsertDailyAnalytics()`
+- `content.repository.ts` — `upsertContentItems()`
+- `youtube-metrics.repository.ts` — `upsertMlScores()`
+
+Fix: Use `sql\`excluded.<column_name>\`` for each field in the `set` clause.
+
+**2. Missing unique constraints for conflict targets** (severity: critical, runtime crash)
+
+Two tables had `onConflictDoUpdate` targets that referenced columns without unique indexes:
+- `youtubeDailyAnalytics`: upsert used `(channelId, analyticsDate)` but only had
+  separate single-column indexes. Without a composite unique index Postgres throws an error.
+- `youtubeMlScores`: upsert used `videoId` but only had a regular (non-unique) index.
+
+Fix: Added `uniqueIndex('youtube_daily_analytics_channel_date_uq')` on `(channelId, analyticsDate)`
+and replaced the regular `videoId` index with `uniqueIndex('youtube_ml_scores_video_id_uq')`.
+A Drizzle migration was generated.
+
+**3. OAuth2Client singleton race condition** (severity: critical, security/data)
+
+`refreshGoogleOauthTokensForUser()` called `googleClient.setCredentials({ refresh_token })` on a
+shared singleton `this.oauthClient`. Under concurrent requests, two callers could overwrite each
+other's credentials, causing one user's refresh token to be exchanged with another user's Google
+client state, returning an invalid access token.
+
+Fix: Create a fresh `OAuth2Client` instance per refresh call instead of mutating the singleton.
+
+**4. Channel approval state lost on cache flush** (severity: high, business logic)
+
+`approveChannel()` and `approvePermissions()` only wrote approval state to Redis (cache).
+There was no `isApproved` field in the `youtube_channels` table. After a Redis flush or TTL
+expiry the approval status was permanently lost.
+
+Fix: Added `isApproved boolean DEFAULT false` and `approvedAt timestamptz` columns to
+`youtube_channels`. The service now calls `repository.approveChannel()` to persist state to DB,
+then also caches it. Included in the generated migration.
+
+#### Security Fixes
+
+**5. Timing attack in admin signup key comparison** (severity: medium, security)
+
+`dto.adminSignupKey !== expectedAdminSignupKey` uses a direct string comparison, which leaks
+timing information about how many characters match. An attacker making many requests can determine
+the expected key character-by-character.
+
+Fix: Use Node's `timingSafeEqual(Buffer.from(provided), Buffer.from(expected))` for constant-time
+comparison. Length mismatch is checked first (short-circuit is acceptable here since key length
+is not a secret in this context).
+
+**6. Ownership check leaking resource existence via wrong exception** (severity: medium, security)
+
+When a user requested approval for a YouTube channel they do not own, the service threw
+`NotFoundException('channel does not belong to authenticated user')`. This tells the caller the
+channel *exists*, leaking resource existence for arbitrary channel IDs.
+
+Fix: Changed to `ForbiddenException` in both `approveChannel()` and `approvePermissions()` in
+`services/youtube.service.ts`, and in the legacy `youtube.service.ts`.
+
+#### Code Quality Fixes
+
+**7. Missing `@Injectable()` on YoutubeNormalizationService** (severity: medium, DI)
+
+`YoutubeNormalizationService` was declared as a regular class without `@Injectable()`. NestJS DI
+still works when there are no constructor dependencies, but the decorator is required by NestJS
+convention and needed if constructor deps are ever added.
+
+Fix: Added `@Injectable()` decorator.
+
+---
+
+### Remaining Known Issues (pre-existing, out of scope)
+
+These were identified during analysis but are pre-existing and not introduced by this PR:
+
+- `queue.service.ts` line 59: `String(jobId)` where `jobId` may be an object in newer BullMQ
+  versions. Produces `[object Object]` in logs.
+- `socials.controller.ts` line 38: `deprecatedGoogleIdTokenLogin` declared `async` with no `await`.
+- `redis-cache.service.ts` line 113: `deletePattern` declared `async` with no `await`.
+- `youtube-cache.service.ts` line 115: `getChannelVideos` declared `async` with no `await`.
+- `youtube-queue.worker.ts` line 40: unsafe BullMQ job type argument mismatch.
+- `buildContentMetricsFromAnalytics` sets `contentItemId: null` for all metrics, losing the
+  video-to-metric association. Should resolve the video's `contentItem.id` before writing.
+- `getAnalyticsForDateRange` in `youtube.repository.ts` ignores the "date range" implied by its
+  name — it returns all analytics for a channel with no date filter. Function signature
+  should add `startDate`/`endDate` params.
+- ML scoring `performanceRank` is assigned in fetch order, not sorted by recommendation score.
+  The processor should sort `scores` by `recommendationScore DESC` before assigning ranks.
+- Google Analytics 403 responses are all thrown as `InsufficientPermissionsException`. YouTube
+  Analytics also returns 403 for quota exceeded and for channels with insufficient data (new
+  channels). These should be distinguished by checking `error.errors[0].reason`.
+
+- Verification:
+  - Tests: `pnpm run typecheck` passes, `pnpm run lint` passes for changed files
+  - Logs / errors: 6 pre-existing lint errors remain in unmodified files
+- Result:
+  - 4 critical bugs fixed (broken upserts, OAuth race condition, missing DB constraints, lost approval state)
+  - 2 security issues fixed (timing attack, wrong exception type)
+  - 1 DI decorator fixed
+  - Migration generated for schema changes

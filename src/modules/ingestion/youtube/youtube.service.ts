@@ -1,5 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import type { RequestUser } from '@/types';
 import type { YoutubeMetricsQueryDto } from '@modules/auth/socials/dto/youtube-metrics-query.dto';
 import { SocialsService } from '@modules/auth/socials/socials.service';
@@ -321,7 +325,7 @@ export class YoutubeIngestionService {
 
       // Verify ownership (user must own the channel)
       if (channel.userId !== actor.id) {
-        throw new NotFoundException(
+        throw new ForbiddenException(
           'YouTube channel does not belong to authenticated user',
         );
       }

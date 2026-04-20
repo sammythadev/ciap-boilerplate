@@ -12,7 +12,8 @@ export class CreatorCompareQueryDto {
   creatorIds?: string;
 
   @ApiPropertyOptional({
-    description: 'Search query to compare top matches when creatorIds is empty.',
+    description:
+      'Search query to compare top matches when creatorIds is empty.',
     example: 'gaming',
   })
   @IsOptional()

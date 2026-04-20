@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import type { RequestUser } from '@/types';
 import type { YoutubeMetricsQueryDto } from '@modules/auth/socials/dto/youtube-metrics-query.dto';
 import { SocialsService } from '@modules/auth/socials/socials.service';
@@ -282,11 +287,12 @@ export class YoutubeIngestionService {
 
       // Verify ownership (user must own the channel)
       if (channel.userId !== actor.id) {
-        throw new NotFoundException(
+        throw new ForbiddenException(
           'YouTube channel does not belong to authenticated user',
         );
       }
 
+      const approved = await this.repository.approveChannel(channel.id);
       await this.cache.setChannelApproved(channel.youtubeChannelId);
 
       this.logger.log(
@@ -298,11 +304,11 @@ export class YoutubeIngestionService {
       );
 
       return {
-        id: channel.id,
-        youtubeChannelId: channel.youtubeChannelId,
-        channelTitle: channel.channelTitle || null,
+        id: approved.id,
+        youtubeChannelId: approved.youtubeChannelId,
+        channelTitle: approved.channelTitle || null,
         isApproved: true,
-        approvedAt: new Date().toISOString(),
+        approvedAt: (approved.approvedAt ?? new Date()).toISOString(),
       };
     } catch (error) {
       this.logger.error(
@@ -332,17 +338,18 @@ export class YoutubeIngestionService {
     }
 
     if (channel.userId !== actor.id) {
-      throw new NotFoundException(
+      throw new ForbiddenException(
         'YouTube channel does not belong to authenticated user',
       );
     }
 
+    const approved = await this.repository.approveChannel(channel.id);
     await this.cache.setChannelApproved(channel.youtubeChannelId);
 
     return {
-      youtubeChannelId: channel.youtubeChannelId,
+      youtubeChannelId: approved.youtubeChannelId,
       permissionsApproved: true,
-      approvedAt: new Date().toISOString(),
+      approvedAt: (approved.approvedAt ?? new Date()).toISOString(),
     };
   }
 

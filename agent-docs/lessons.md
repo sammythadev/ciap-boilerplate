@@ -49,3 +49,21 @@ Reusable lessons, mistakes, debugging notes, and tooling cautions.
 - Lesson: Convert user corrections into explicit prevention rules in this file.
 - Avoid: Treating corrections as one-off comments that are forgotten next session.
 - Apply: Record the correction, the mistake pattern, and the rule that should prevent recurrence.
+
+## Drizzle Batch Upsert Pattern: Always Use sql`excluded.*` (2026-04-20)
+
+- Mistake: Using `set: { field: array[0]?.field }` in `onConflictDoUpdate` for batch inserts.
+- Lesson: This sets ALL conflicting rows to the first item's values. For batch upserts, always use `sql\`excluded.column_name\`` to reference each row's own incoming value.
+- Rule: Before committing any `onConflictDoUpdate`, verify the `set` clause uses `sql\`excluded.*\`` for field-level updates, not JavaScript variable references.
+
+## Schema Must Have Unique Constraints Before Using Them as Conflict Targets (2026-04-20)
+
+- Mistake: Writing `onConflictDoUpdate({ target: [col1, col2] })` without a corresponding unique index in the schema.
+- Lesson: PostgreSQL requires the conflict target columns to have a unique constraint. Without it the upsert throws at runtime. Check `schema.ts` for `uniqueIndex` before using column(s) as conflict target.
+- Rule: Every `onConflictDoUpdate` target must have a matching `uniqueIndex` in the schema.
+
+## Singleton Service + setCredentials() Is a Race Condition (2026-04-20)
+
+- Mistake: Calling `googleClient.setCredentials(refreshToken)` on a singleton OAuth2Client instance.
+- Lesson: Concurrent requests sharing one client overwrite each other's credentials.
+- Rule: Create a fresh `OAuth2Client` per request when calling `setCredentials()`.

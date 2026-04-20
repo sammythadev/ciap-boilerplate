@@ -1,4 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
+import { sql } from 'drizzle-orm';
 import { DATABASE_PROVIDER } from '@database/database.module';
 import type { Database } from '@database/database.module';
 import { youtubeMlScores, NewYoutubeMlScore } from '@database/drizzle/schema';
@@ -13,7 +14,8 @@ export class YoutubeMetricsRepository {
 
   /**
    * Upsert ML scores for videos.
-   * Overwrites previous scores for the same video.
+   * Overwrites previous scores for the same video using SQL EXCLUDED.
+   * Requires unique index on videoId (one active score per video).
    */
   async upsertMlScores(
     scores: Array<Omit<NewYoutubeMlScore, 'createdAt' | 'updatedAt'>>,
@@ -24,12 +26,13 @@ export class YoutubeMetricsRepository {
       .onConflictDoUpdate({
         target: youtubeMlScores.videoId,
         set: {
-          engagementScore: scores[0]?.engagementScore ?? 0,
-          growthScore: scores[0]?.growthScore ?? 0,
-          recommendationScore: scores[0]?.recommendationScore ?? 0,
-          performanceRank: scores[0]?.performanceRank ?? null,
-          jobId: scores[0]?.jobId ?? null,
-          updatedAt: new Date(),
+          engagementScore: sql`excluded.engagement_score`,
+          growthScore: sql`excluded.growth_score`,
+          recommendationScore: sql`excluded.recommendation_score`,
+          performanceRank: sql`excluded.performance_rank`,
+          jobId: sql`excluded.job_id`,
+          scoredAt: sql`excluded.scored_at`,
+          updatedAt: sql`now()`,
         },
       })
       .returning()

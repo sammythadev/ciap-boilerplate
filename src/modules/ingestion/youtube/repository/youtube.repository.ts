@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { DATABASE_PROVIDER } from '@database/database.module';
 import type { Database } from '@database/database.module';
 import {
@@ -49,6 +49,7 @@ export class YoutubeRepository {
 
   /**
    * Upsert multiple videos for a channel.
+   * Uses SQL EXCLUDED to update each row with its own incoming values.
    */
   async upsertVideos(videos: NewYoutubeVideo[]): Promise<YoutubeVideo[]> {
     if (videos.length === 0) return [];
@@ -59,13 +60,14 @@ export class YoutubeRepository {
       .onConflictDoUpdate({
         target: youtubeVideos.youtubeVideoId,
         set: {
-          videoTitle: videos[0]?.videoTitle,
-          videoDescription: videos[0]?.videoDescription,
-          publishedAt: videos[0]?.publishedAt,
-          durationSeconds: videos[0]?.durationSeconds,
-          viewCount: videos[0]?.viewCount,
-          likeCount: videos[0]?.likeCount,
-          commentCount: videos[0]?.commentCount,
+          videoTitle: sql`excluded.video_title`,
+          videoDescription: sql`excluded.video_description`,
+          publishedAt: sql`excluded.published_at`,
+          durationSeconds: sql`excluded.duration_seconds`,
+          viewCount: sql`excluded.view_count`,
+          likeCount: sql`excluded.like_count`,
+          commentCount: sql`excluded.comment_count`,
+          updatedAt: sql`now()`,
         },
       })
       .returning();
@@ -73,6 +75,8 @@ export class YoutubeRepository {
 
   /**
    * Upsert daily analytics for a channel.
+   * Uses SQL EXCLUDED to update each row with its own incoming values.
+   * Requires composite unique index on (channelId, analyticsDate).
    */
   async upsertDailyAnalytics(
     analytics: NewYoutubeDailyAnalytics[],
@@ -88,11 +92,11 @@ export class YoutubeRepository {
           youtubeDailyAnalytics.analyticsDate,
         ],
         set: {
-          views: analytics[0]?.views,
-          estimatedMinutesWatched: analytics[0]?.estimatedMinutesWatched,
-          averageViewDurationSeconds: analytics[0]?.averageViewDurationSeconds,
-          subscribersGained: analytics[0]?.subscribersGained,
-          subscribersLost: analytics[0]?.subscribersLost,
+          views: sql`excluded.views`,
+          estimatedMinutesWatched: sql`excluded.estimated_minutes_watched`,
+          averageViewDurationSeconds: sql`excluded.average_view_duration_seconds`,
+          subscribersGained: sql`excluded.subscribers_gained`,
+          subscribersLost: sql`excluded.subscribers_lost`,
         },
       })
       .returning();
@@ -179,5 +183,20 @@ export class YoutubeRepository {
     await this.db
       .delete(youtubeChannels)
       .where(eq(youtubeChannels.id, channelId));
+  }
+
+  /**
+   * Mark a YouTube channel as approved for analytics tracking.
+   */
+  async approveChannel(channelId: number): Promise<YoutubeChannel> {
+    const [updated] = await this.db
+      .update(youtubeChannels)
+      .set({
+        isApproved: true,
+        approvedAt: new Date(),
+      })
+      .where(eq(youtubeChannels.id, channelId))
+      .returning();
+    return updated;
   }
 }

@@ -138,7 +138,10 @@ export class AuthGoogleOauthService {
       if (error instanceof InvalidTokenException) {
         throw error;
       }
-      if (error instanceof JsonWebTokenError || error instanceof TokenExpiredError) {
+      if (
+        error instanceof JsonWebTokenError ||
+        error instanceof TokenExpiredError
+      ) {
         throw new InvalidTokenException({ reason: 'invalid-oauth-state' });
       }
       throw error;
@@ -227,12 +230,17 @@ export class AuthGoogleOauthService {
     }
 
     try {
-      const googleClient = this.getGoogleClient();
-      googleClient.setCredentials({
+      // Create a fresh client per request to avoid race conditions when
+      // concurrent callers share a singleton with setCredentials() state.
+      const freshClient = new OAuth2Client(
+        this.getGoogleClientId(),
+        this.configService.get<string>('GOOGLE_CLIENT_SECRET') || '',
+      );
+      freshClient.setCredentials({
         refresh_token: oauthAccount.refreshToken,
       });
 
-      const { credentials } = await googleClient.refreshAccessToken();
+      const { credentials } = await freshClient.refreshAccessToken();
       const accessToken = credentials.access_token ?? oauthAccount.accessToken;
 
       if (!accessToken) {
@@ -340,8 +348,7 @@ export class AuthGoogleOauthService {
       return;
     }
 
-    let tokenExpiresAt =
-      googleTokens.expiresAt ?? oauthAccount.tokenExpiresAt;
+    let tokenExpiresAt = googleTokens.expiresAt ?? oauthAccount.tokenExpiresAt;
     if (googleTokens.expiresAt === null) {
       tokenExpiresAt = null;
     }

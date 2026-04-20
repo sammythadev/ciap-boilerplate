@@ -218,6 +218,8 @@ export const youtubeChannels = pgTable(
     videoCount: integer('video_count').default(0),
     totalViewCount: bigint('total_view_count', { mode: 'number' }).default(0),
     uploadPlaylistId: text('upload_playlist_id'),
+    isApproved: boolean('is_approved').notNull().default(false),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
     lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -311,6 +313,9 @@ export const youtubeDailyAnalytics = pgTable(
     youtubeDailyAnalyticsDateIdx: index('youtube_daily_analytics_date_idx').on(
       table.analyticsDate,
     ),
+    youtubeDailyAnalyticsChannelDateUq: uniqueIndex(
+      'youtube_daily_analytics_channel_date_uq',
+    ).on(table.channelId, table.analyticsDate),
   }),
 );
 
@@ -342,7 +347,7 @@ export const youtubeMlScores = pgTable(
       .defaultNow(),
   },
   (table) => ({
-    youtubeMlVideoIdx: index('youtube_ml_scores_video_id_idx').on(
+    youtubeMlVideoUq: uniqueIndex('youtube_ml_scores_video_id_uq').on(
       table.videoId,
     ),
     youtubeMlJobIdx: index('youtube_ml_scores_job_id_idx').on(table.jobId),
@@ -441,9 +446,12 @@ export const contentMetrics = pgTable(
     userId: integer('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    contentItemId: integer('content_item_id').references(() => contentItems.id, {
-      onDelete: 'cascade',
-    }),
+    contentItemId: integer('content_item_id').references(
+      () => contentItems.id,
+      {
+        onDelete: 'cascade',
+      },
+    ),
     platform: contentPlatformEnum('platform').notNull(),
     metricName: text('metric_name').notNull(),
     metricValue: real('metric_value').notNull().default(0),
@@ -455,7 +463,9 @@ export const contentMetrics = pgTable(
       .defaultNow(),
   },
   (table) => ({
-    contentMetricsUserIdx: index('content_metrics_user_id_idx').on(table.userId),
+    contentMetricsUserIdx: index('content_metrics_user_id_idx').on(
+      table.userId,
+    ),
     contentMetricsItemIdx: index('content_metrics_item_id_idx').on(
       table.contentItemId,
     ),
@@ -479,9 +489,12 @@ export const contentConversions = pgTable(
     userId: integer('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    contentItemId: integer('content_item_id').references(() => contentItems.id, {
-      onDelete: 'cascade',
-    }),
+    contentItemId: integer('content_item_id').references(
+      () => contentItems.id,
+      {
+        onDelete: 'cascade',
+      },
+    ),
     platform: contentPlatformEnum('platform').notNull(),
     conversionType: text('conversion_type').notNull(),
     conversionCount: integer('conversion_count').notNull().default(0),
@@ -604,14 +617,17 @@ export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
   }),
 }));
 
-export const contentItemsRelations = relations(contentItems, ({ one, many }) => ({
-  user: one(users, {
-    fields: [contentItems.userId],
-    references: [users.id],
+export const contentItemsRelations = relations(
+  contentItems,
+  ({ one, many }) => ({
+    user: one(users, {
+      fields: [contentItems.userId],
+      references: [users.id],
+    }),
+    metrics: many(contentMetrics),
+    conversions: many(contentConversions),
   }),
-  metrics: many(contentMetrics),
-  conversions: many(contentConversions),
-}));
+);
 
 export const contentMetricsRelations = relations(contentMetrics, ({ one }) => ({
   user: one(users, {

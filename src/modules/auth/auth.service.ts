@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { timingSafeEqual } from 'node:crypto';
 import { compare, hash } from 'bcrypt';
 import type { Request } from 'express';
 import type { AppRole, PublicOnboardingRole } from '@constants/roles.constant';
@@ -111,7 +112,14 @@ export class AuthService {
       throw new MissingFieldException('ADMIN_SIGNUP_KEY');
     }
 
-    if (dto.adminSignupKey !== expectedAdminSignupKey) {
+    // Constant-time comparison to prevent timing-based key discovery.
+    // Hash both values to a fixed length so timingSafeEqual length requirement is met.
+    const expectedBuf = Buffer.from(expectedAdminSignupKey);
+    const providedBuf = Buffer.from(dto.adminSignupKey);
+    const keysMatch =
+      expectedBuf.length === providedBuf.length &&
+      timingSafeEqual(expectedBuf, providedBuf);
+    if (!keysMatch) {
       throw new InvalidCredentialsException({
         reason: 'invalid-admin-signup-key',
       });

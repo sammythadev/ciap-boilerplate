@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type {
   YoutubeChannel,
   YoutubeVideo,
@@ -33,6 +33,7 @@ export type NormalizedYoutubeDailyAnalytics = Omit<
   channelId: number; // must be set by caller after channel insert
 };
 
+@Injectable()
 export class YoutubeNormalizationService {
   private readonly logger = new Logger(YoutubeNormalizationService.name);
 
@@ -76,6 +77,8 @@ export class YoutubeNormalizationService {
       videoCount: this.parseStringInt(stats.videoCount),
       totalViewCount: Number(this.parseStringBigInt(stats.viewCount)),
       uploadPlaylistId: uploadPlaylist || null,
+      isApproved: false,
+      approvedAt: null,
     };
   }
 

@@ -29,11 +29,15 @@ export class CreatorDiscoveryRepository {
     }
 
     if (params.minInfluenceScore !== undefined) {
-      filters.push(sql`${userProfiles.influenceScore} >= ${params.minInfluenceScore}`);
+      filters.push(
+        sql`${userProfiles.influenceScore} >= ${params.minInfluenceScore}`,
+      );
     }
 
     if (params.maxInfluenceScore !== undefined) {
-      filters.push(sql`${userProfiles.influenceScore} <= ${params.maxInfluenceScore}`);
+      filters.push(
+        sql`${userProfiles.influenceScore} <= ${params.maxInfluenceScore}`,
+      );
     }
 
     const query = this.db
@@ -57,7 +61,10 @@ export class CreatorDiscoveryRepository {
       );
     }
 
-    return query.where(and(...filters)).limit(params.limit).offset(params.offset);
+    return query
+      .where(and(...filters))
+      .limit(params.limit)
+      .offset(params.offset);
   }
 
   async getCreatorsByIds(ids: number[]) {
