@@ -50,6 +50,7 @@ jobs:
       - name: Run tests
         run: pnpm run test
         env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_ACCESS_PUBLIC_KEY: |-
             -----BEGIN PUBLIC KEY-----
             MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEfrxqhBTlD++CmuMRJ/B+1vo9eM90
