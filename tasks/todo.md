@@ -24,6 +24,23 @@ Use this file to keep substantial tasks planned, tracked, and closed out.
 
 ## Active / Recent Tasks
 
+## Task: Harden container + add CI build/push
+
+- Date: 2026-04-21
+- Request: Apply DevSecOps container hardening, reduce image size, and add CI that builds, tests, and pushes to Docker Hub.
+- Plan:
+  - [x] Convert Dockerfile to a multi-stage build with prod-only deps and non-root runtime.
+  - [x] Add runtime init and production start command.
+  - [x] Add CI workflow to test, build, and push Docker image.
+- Progress:
+  - Updated Dockerfile to slim runtime and drop dev deps.
+  - Added Buildx-based GitHub Actions workflow for tests and push.
+- Verification:
+  - Tests: not run (CI change only)
+  - Logs / errors: not checked
+- Result:
+  - Completed container hardening and CI pipeline setup.
+
 ## Task: Align Docker env defaults
 
 - Date: 2026-04-18
