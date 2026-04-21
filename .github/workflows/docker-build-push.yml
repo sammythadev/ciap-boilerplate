@@ -49,6 +49,35 @@ jobs:
 
       - name: Run tests
         run: pnpm run test
+        env:
+          JWT_ACCESS_PUBLIC_KEY: |-
+            -----BEGIN PUBLIC KEY-----
+            MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEfrxqhBTlD++CmuMRJ/B+1vo9eM90
+            Q0SWK62cEdGuP0n1SUMg6zFWtd3ADNfwVOdcrNkD278LODO+IXsWfn6AtQ==
+            -----END PUBLIC KEY-----
+          JWT_ACCESS_PRIVATE_KEY: |-
+            -----BEGIN PRIVATE KEY-----
+            MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQguzt8czkCOc9XT94V
+            LeWsvglPyPDA5KLTAORsmVGYWnahRANCAAR+vGqEFOUP74Ka4xEn8H7W+j14z3RD
+            RJYrrZwR0a4/SfVJQyDrMVa13cAM1/BU51ys2QPbvws4M74hexZ+foC1
+            -----END PRIVATE KEY-----
+          JWT_REFRESH_PUBLIC_KEY: |-
+            -----BEGIN PUBLIC KEY-----
+            MIGbMBAGByqGSM49AgEGBSuBBAAjA4GGAAQAtnpOP4QkD0WOEEBdnsWVaaIZhoDx
+            6kh0r7MvAKju5NF1DiGlm51D6zAXJGvkYk9V2S9GehcxlmSCv1d89VJb0JUBpIIw
+            BRlKnHpHGlgDU295YAd3uskUHEN2XGhPS4Fr+cm9dCmKTEnpbHy9DEhjIjx0NyRJ
+            ntvfInTVmxUEcKh/ojo=
+            -----END PUBLIC KEY-----
+          JWT_REFRESH_PRIVATE_KEY: |-
+            -----BEGIN PRIVATE KEY-----
+            MIHuAgEAMBAGByqGSM49AgEGBSuBBAAjBIHWMIHTAgEBBEIAq05BCXFIz47/3cHu
+            +pEBibbkaBqG2tZ+TjC3ymyZnUmqHVuDZ/5tWD89mOQXtuPE4i1jnM7/updLcDAe
+            ZThbwgGhgYkDgYYABAC2ek4/hCQPRY4QQF2exZVpohmGgPHqSHSvsy8AqO7k0XUO
+            IaWbnUPrMBcka+RiT1XZL0Z6FzGWZIK/V3z1UlvQlQGkgjAFGUqcekcaWANTb3lg
+            B3e6yRQcQ3ZcaE9LgWv5yb10KYpMSelsfL0MSGMiPHQ3JEme298idNWbFQRwqH+i
+            Og==
+            -----END PRIVATE KEY-----
+          ADMIN_SIGNUP_KEY: test-admin-key
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
