@@ -190,35 +190,61 @@ export class SocialsService {
     const maxVideos = Math.min(query.maxVideos ?? 10, 10);
 
     const accessToken = await this.resolveGoogleAccessToken(actor);
-    const channel = await this.fetchGoogleJson<YoutubeChannelResponse>(
-      'https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&mine=true',
-      accessToken,
-    );
-    const channelItem = channel.items?.[0] ?? null;
-    if (!channelItem) {
-      throw new YoutubeChannelNotFoundException({ reason: 'no-channel' });
-    }
-    if (!channelItem.id) {
-      throw new ValidationException(
-        'YouTube channel ID is missing; reconnect Google OAuth.',
-        { reason: 'missing-channel-id' },
+
+    let channel: YoutubeChannelResponse;
+    let channelItem:
+      | NonNullable<YoutubeChannelResponse['items']>[number]
+      | null;
+    let videos: YoutubeVideosResponse;
+
+    try {
+      channel = await this.fetchGoogleJson<YoutubeChannelResponse>(
+        'https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&mine=true',
+        accessToken,
       );
+      channelItem = channel.items?.[0] ?? null;
+      if (!channelItem) {
+        throw new YoutubeChannelNotFoundException({ reason: 'no-channel' });
+      }
+      if (!channelItem.id) {
+        throw new ValidationException(
+          'YouTube channel ID is missing; reconnect Google OAuth.',
+          { reason: 'missing-channel-id' },
+        );
+      }
+
+      const searchResult = await this.fetchGoogleJson<YoutubeSearchResponse>(
+        `https://www.googleapis.com/youtube/v3/search?part=id&forMine=true&type=video&order=date&maxResults=${maxVideos}`,
+        accessToken,
+      );
+
+      const videoIds = (searchResult.items || [])
+        .map((item) => item.id?.videoId)
+        .filter((value): value is string => Boolean(value));
+
+      videos = videoIds.length
+        ? await this.fetchGoogleJson<YoutubeVideosResponse>(
+            `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${videoIds.join(',')}`,
+            accessToken,
+          )
+        : { items: [] };
+    } catch (error) {
+      if (error instanceof InsufficientPermissionsException) {
+        throw this.buildGoogleOauthRequiredException(
+          'insufficient-youtube-scopes',
+          actor,
+          {
+            requiredScopes: [
+              'https://www.googleapis.com/auth/youtube.readonly',
+              'https://www.googleapis.com/auth/yt-analytics.readonly',
+            ],
+            ...error.details,
+          },
+        );
+      }
+
+      throw error;
     }
-    const searchResult = await this.fetchGoogleJson<YoutubeSearchResponse>(
-      `https://www.googleapis.com/youtube/v3/search?part=id&forMine=true&type=video&order=date&maxResults=${maxVideos}`,
-      accessToken,
-    );
-
-    const videoIds = (searchResult.items || [])
-      .map((item) => item.id?.videoId)
-      .filter((value): value is string => Boolean(value));
-
-    const videos = videoIds.length
-      ? await this.fetchGoogleJson<YoutubeVideosResponse>(
-          `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${videoIds.join(',')}`,
-          accessToken,
-        )
-      : { items: [] };
 
     let analytics = { columnHeaders: [], rows: [] } as YoutubeAnalyticsResponse;
     let analyticsStatus: 'success' | 'warning' = 'success';
@@ -442,8 +468,11 @@ export class SocialsService {
   private buildGoogleOauthRequiredException(
     reason: string,
     actor: RequestUser,
+    extraDetails?: Record<string, unknown>,
   ): InvalidTokenException {
     const oauthHint = this.prepareGoogleOauth2Youtube(actor);
+    const safeExtraDetails = { ...(extraDetails ?? {}) };
+    delete safeExtraDetails.reason;
 
     return new InvalidTokenException({
       provider: 'google',
@@ -451,6 +480,7 @@ export class SocialsService {
       action: 'oauth2-link-required',
       authorizationUrl: oauthHint.authorizationUrl,
       redirectUri: oauthHint.redirectUri,
+      ...safeExtraDetails,
     });
   }
 

@@ -16,18 +16,11 @@ import {
   MissingFieldException,
 } from '@common/exceptions';
 import type { PublicOnboardingRole } from '@constants/roles.constant';
-import type { OauthAccount } from '@database/drizzle/schema';
 import { UsersRepository } from '@modules/users/users.repository';
 import { AuthRepository } from './auth.repository';
 import { AuthTokensService } from './auth-tokens.service';
 import type { OAuth2Provider } from './dto/oauth2-provider.dto';
 import type { RequestUser } from '@/types';
-
-export type GoogleTokenExchangePayload = {
-  accessToken?: string;
-  refreshToken?: string;
-  expiresAt?: Date | null;
-};
 
 export type GoogleOauthPurpose = 'login' | 'youtube-connect';
 
@@ -349,32 +342,6 @@ export class AuthGoogleOauthService {
         reason: 'token-verification-failed',
       });
     }
-  }
-
-  async saveGoogleOauthTokens(
-    oauthAccount: OauthAccount | null,
-    googleTokens: GoogleTokenExchangePayload | undefined,
-    email: string,
-  ): Promise<void> {
-    if (!oauthAccount) {
-      return;
-    }
-
-    if (!googleTokens?.accessToken && !googleTokens?.refreshToken) {
-      return;
-    }
-
-    let tokenExpiresAt = googleTokens.expiresAt ?? oauthAccount.tokenExpiresAt;
-    if (googleTokens.expiresAt === null) {
-      tokenExpiresAt = null;
-    }
-
-    await this.authRepository.updateOauthAccountTokens(oauthAccount.id, {
-      accessToken: googleTokens.accessToken ?? oauthAccount.accessToken,
-      refreshToken: googleTokens.refreshToken ?? oauthAccount.refreshToken,
-      tokenExpiresAt,
-      email,
-    });
   }
 
   isGoogleInvalidGrantError(error: unknown): boolean {

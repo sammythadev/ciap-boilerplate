@@ -4,7 +4,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { compare, hash } from 'bcrypt';
 import type { Request } from 'express';
 import type { AppRole, PublicOnboardingRole } from '@constants/roles.constant';
-import type { NewAuditLog, OauthAccount, User } from '@database/drizzle/schema';
+import type { NewAuditLog, User } from '@database/drizzle/schema';
 import {
   AccountDisabledException,
   DuplicateEmailException,
@@ -30,7 +30,6 @@ import { getRequestIp } from './auth.utils';
 import type {
   GoogleOauthPurpose,
   GoogleOauthStatePayload,
-  GoogleTokenExchangePayload,
 } from './auth-google-oauth.service';
 
 @Injectable()
@@ -263,7 +262,6 @@ export class AuthService {
   async loginWithGoogle(
     dto: GoogleAuthDto,
     request: Request,
-    googleTokens?: GoogleTokenExchangePayload,
   ): Promise<AuthResponseDto> {
     const payload = await this.googleOauthService.verifyGoogleIdToken(
       dto.idToken,
@@ -286,8 +284,6 @@ export class AuthService {
       'google',
       googleSubject,
     );
-    let oauthAccount: OauthAccount | null = existingOauth;
-
     if (existingOauth) {
       user = await this.usersRepository.findByIdOrNull(existingOauth.userId);
     } else {
@@ -322,7 +318,7 @@ export class AuthService {
         });
       }
 
-      oauthAccount = await this.authRepository.createOauthAccount({
+      await this.authRepository.createOauthAccount({
         userId: user.id,
         provider: 'google',
         providerUserId: googleSubject,
@@ -343,11 +339,6 @@ export class AuthService {
 
     await this.usersRepository.markEmailVerified(user.id);
     await this.usersRepository.updateLastLogin(user.id);
-    await this.googleOauthService.saveGoogleOauthTokens(
-      oauthAccount,
-      googleTokens,
-      email,
-    );
 
     await this.writeAuditLog({
       userId: user.id,
@@ -383,17 +374,15 @@ export class AuthService {
           this.googleOauthService.getGoogleLoginRedirectUri(),
         );
 
+      // App login issues first-party JWTs. Persisting login-scoped Google API
+      // tokens here can overwrite the YouTube integration grant for the same
+      // Google account, so only the YouTube connect flow stores Google tokens.
       return this.loginWithGoogle(
         {
           idToken: tokens.idToken,
           role,
         },
         request,
-        {
-          accessToken: tokens.accessToken ?? undefined,
-          refreshToken: tokens.refreshToken ?? undefined,
-          expiresAt: tokens.expiresAt,
-        },
       );
     } catch (error) {
       if (

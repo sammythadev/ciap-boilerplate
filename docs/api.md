@@ -180,6 +180,11 @@ http://localhost:3000/ingestion/youtube/oauth2/callback?code=...&state=...&iss=.
 
 The callback immediately runs the YouTube ingestion sync and queues influence scoring.
 
+Important:
+
+- Google sign-in (`/auth/socials/oauth2/google/login`) is only for app authentication.
+- YouTube ingestion requires the separate `/ingestion/youtube/oauth2` consent flow because the login flow does not grant YouTube scopes.
+
 ### Pull YouTube metrics
 
 ```bash
@@ -207,6 +212,7 @@ curl "http://localhost:3000/ingestion/youtube/metrics?days=30&maxVideos=10" \
 Notes:
 
 - Uses the authenticated user's stored Google OAuth token (linked via `/ingestion/youtube/oauth2`).
+- If the stored Google token lacks YouTube scopes, the API returns `401` with `oauth2-link-required` details so the user can reconnect through `/ingestion/youtube/oauth2`.
 - Returns channel info including `statistics.viewCount` and a top-level `channelViews`.
 - Pulls analytics metrics for the requested date window (`days <= 90`).
 - Returns `401` with `oauth2-link-required` details if no Google OAuth token is available.

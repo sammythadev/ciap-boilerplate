@@ -24,6 +24,27 @@ Use this file to keep substantial tasks planned, tracked, and closed out.
 
 ## Active / Recent Tasks
 
+## Task: Stop Google login from overwriting YouTube OAuth grants
+
+- Date: 2026-04-23
+- Request: Confirm whether YouTube metrics was reusing the wrong Google token set, decide whether separate storage is needed for login vs YouTube tokens, and fix the bug safely.
+- Plan:
+  - [x] Trace Google login, YouTube connect, and YouTube metrics token resolution paths.
+  - [x] Patch the shared-storage bug with the smallest safe change.
+  - [x] Add focused tests and verify lint/typecheck status for the touched auth/socials code.
+- Progress:
+  - Confirmed the repo stores a single Google `oauth_accounts` row per linked account/provider and both login + YouTube connect were writing into that same slot.
+  - Confirmed `/ingestion/youtube/metrics` reads that same stored Google row, so a later login could replace the YouTube-scoped grant with a basic login-scoped token and trigger Google `insufficientPermissions` on YouTube APIs.
+  - Stopped the login authorization-code flow from persisting Google API access/refresh tokens; only the YouTube connect flow now stores Google tokens for API use.
+  - Updated YouTube metrics to return reconnect guidance when the stored Google grant lacks YouTube scopes, instead of surfacing a raw 403 from Google.
+- Verification:
+  - Tests: `cmd /c pnpm exec jest --config test/jest-e2e.json --runInBand --runTestsByPath src/modules/auth/auth.service.spec.ts src/modules/auth/socials/socials.service.spec.ts src/modules/ingestion/youtube/youtube.service.spec.ts` (pass)
+  - Logs / errors: `cmd /c pnpm exec eslint src/modules/auth/auth.service.ts src/modules/auth/auth-google-oauth.service.ts src/modules/auth/socials/socials.service.ts` (pass)
+  - Logs / errors: `cmd /c pnpm run typecheck` (pass)
+- Result:
+  - Completed. The YouTube metrics bug was caused by shared Google token storage, and the fix keeps login-scoped Google tokens out of persistent integration storage.
+  - Separate columns are not the best next step here; the smaller safe design is to persist only the YouTube/API grant. If the product later needs multiple Google grants concurrently, model them as separate records by purpose, not as parallel token columns on one row.
+
 ## Task: Fix runtime missing safer-buffer during POST body parsing
 
 - Date: 2026-04-23

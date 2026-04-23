@@ -141,3 +141,10 @@ Append-only notes for discoveries, decisions, and gotchas.
 - Finding: The error occurred in `body-parser -> raw-body -> iconv-lite` while parsing the request body, before refresh-token logic ran. `safer-buffer` was only present as a transitive dependency.
 - Impact: A broken production install can appear as an endpoint-specific auth bug even when the real failure is lower-level request parsing. Making the runtime module explicit in `package.json` reduces that risk.
 - Follow-up: If the deployed container still throws the same error after rebuild, inspect the image build/install process for incomplete pnpm dependency layout rather than the auth module.
+
+## Google Login Must Not Persist API Tokens Into Shared oauth_accounts Slot (2026-04-23)
+
+- Context: Investigated YouTube metrics 403s that appeared after users logged in with Google.
+- Finding: The repo stores one Google `oauth_accounts` record per linked Google identity/provider, and both Google login and YouTube connect were updating that same row. Because login only requests `openid email profile`, it could overwrite the YouTube grant with a token that lacks `youtube.readonly` and `yt-analytics.readonly`.
+- Impact: YouTube API endpoints that rely on stored Google tokens can fail with Google `insufficientPermissions` even when the user previously completed YouTube connect. The safe current pattern is: Google login uses the ID token for app auth only; only the YouTube connect flow persists Google access/refresh tokens for API calls.
+- Follow-up: If the product later needs multiple Google grants for different purposes, model them as separate records keyed by purpose/grant type rather than separate token columns on one shared row.
