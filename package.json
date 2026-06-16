@@ -112,7 +112,7 @@
     "@types/passport-oauth2": "^1.8.0",
     "@types/pg": "^8.20.0",
     "@types/supertest": "^7.2.0",
-    "cross-env": "^7.0.3",
+    "cross-env": "^10.1.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
