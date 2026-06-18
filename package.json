@@ -87,7 +87,7 @@
     "safer-buffer": "2.1.2",
     "swagger-ui-express": "^4.6.3",
     "typeorm": "^0.3.28",
-    "uuid": "^13.0.0",
+    "uuid": "^14.0.0",
     "winston": "^3.19.0"
   },
   "devDependencies": {
