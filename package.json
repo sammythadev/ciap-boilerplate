@@ -131,7 +131,7 @@
     "ts-prune": "^0.10.3",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.58.2"
+    "typescript-eslint": "^8.60.0"
   },
   "lint-staged": {
     "**/*.ts": [
